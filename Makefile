@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g
 TARGET = ndn
-SRC = main.c commands.c network.c objects.c
+SRC = main.c commands.c network.c objects.c debug_utils.c
 OBJ = $(SRC:.c=.o)
 
 all: $(TARGET)

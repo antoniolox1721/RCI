@@ -1,26 +1,26 @@
 /*
- * Named Data Network (NDN) Implementation
- * Computer Networks and Internet - 2024/2025
+ * Implementação de Rede de Dados Identificados por Nome (NDN)
+ * Redes de Computadores e Internet - 2024/2025
  * 
- * objects.c - Implementation of object handling functions
+ * objects.c - Implementação das funções de manipulação de objetos
  */
 
 #include "objects.h"
-
+#include "debug_utils.h"
 /*
- * Add an object
+ * Adiciona um objeto
  */
 int add_object(char *name) {
-    /* Check if the object already exists */
+    /* Verifica se o objeto já existe */
     Object *curr = node.objects;
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            return 0;  /* Object already exists */
+            return 0;  /* Objeto já existe */
         }
         curr = curr->next;
     }
     
-    /* Create a new object */
+    /* Cria um novo objeto */
     Object *new_object = malloc(sizeof(Object));
     if (new_object == NULL) {
         perror("malloc");
@@ -29,7 +29,7 @@ int add_object(char *name) {
     
     strcpy(new_object->name, name);
     
-    /* Add to the list of objects */
+    /* Adiciona à lista de objetos */
     new_object->next = node.objects;
     node.objects = new_object;
     
@@ -37,16 +37,16 @@ int add_object(char *name) {
 }
 
 /*
- * Remove an object
+ * Remove um objeto
  */
 int remove_object(char *name) {
-    /* Find the object */
+    /* Procura o objeto */
     Object *prev = NULL;
     Object *curr = node.objects;
     
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            /* Remove from the list */
+            /* Remove da lista */
             if (prev == NULL) {
                 node.objects = curr->next;
             } else {
@@ -61,25 +61,25 @@ int remove_object(char *name) {
         curr = curr->next;
     }
     
-    return -1;  /* Object not found */
+    return -1;  /* Objeto não encontrado */
 }
 
 /*
- * Add an object to the cache
+ * Adiciona um objeto à cache
  */
 int add_to_cache(char *name) {
-    /* Check if the object already exists in the cache */
+    /* Verifica se o objeto já existe na cache */
     Object *curr = node.cache;
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            return 0;  /* Object already in cache */
+            return 0;  /* Objeto já está na cache */
         }
         curr = curr->next;
     }
     
-    /* Check if the cache is full */
+    /* Verifica se a cache está cheia */
     if (node.current_cache_size >= node.cache_size) {
-        /* Remove the oldest object (first in the list) */
+        /* Remove o objeto mais antigo (primeiro na lista) */
         if (node.cache != NULL) {
             Object *oldest = node.cache;
             node.cache = oldest->next;
@@ -88,7 +88,7 @@ int add_to_cache(char *name) {
         }
     }
     
-    /* Create a new cache entry */
+    /* Cria uma nova entrada na cache */
     Object *new_object = malloc(sizeof(Object));
     if (new_object == NULL) {
         perror("malloc");
@@ -97,62 +97,73 @@ int add_to_cache(char *name) {
     
     strcpy(new_object->name, name);
     
-    /* Add to the list of cached objects */
+    /* Adiciona à lista de objetos em cache */
     new_object->next = node.cache;
     node.cache = new_object;
     node.current_cache_size++;
     
     return 0;
 }
-
+InterestEntry* find_interest_entry(char *name) {
+    InterestEntry *entry = node.interest_table;
+    
+    while (entry != NULL) {
+        if (strcmp(entry->name, name) == 0) {
+            return entry;
+        }
+        entry = entry->next;
+    }
+    
+    return NULL;
+}
 /*
- * Find an object by name
+ * Procura um objeto pelo nome
  */
 int find_object(char *name) {
-    /* Search in the list of objects */
+    /* Procura na lista de objetos */
     Object *curr = node.objects;
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            return 0;  /* Object found */
+            return 0;  /* Objeto encontrado */
         }
         curr = curr->next;
     }
     
-    return -1;  /* Object not found */
+    return -1;  /* Objeto não encontrado */
 }
 
 /*
- * Find an object in the cache
+ * Procura um objeto na cache
  */
 int find_in_cache(char *name) {
-    /* Search in the cache */
+    /* Procura na cache */
     Object *curr = node.cache;
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            return 0;  /* Object found in cache */
+            return 0;  /* Objeto encontrado na cache */
         }
         curr = curr->next;
     }
     
-    return -1;  /* Object not found in cache */
+    return -1;  /* Objeto não encontrado na cache */
 }
 
 /*
- * Add an interest entry
+ * Adiciona uma entrada de interesse
  */
 int add_interest_entry(char *name, int interface_id, enum interface_state state) {
-    /* Check if the entry already exists */
+    /* Verifica se a entrada já existe */
     InterestEntry *curr = node.interest_table;
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            /* Entry exists, update it */
+            /* Entrada existe, atualiza-a */
             curr->interface_states[interface_id] = state;
             return 0;
         }
         curr = curr->next;
     }
     
-    /* Create a new entry */
+    /* Cria uma nova entrada */
     InterestEntry *new_entry = malloc(sizeof(InterestEntry));
     if (new_entry == NULL) {
         perror("malloc");
@@ -161,50 +172,66 @@ int add_interest_entry(char *name, int interface_id, enum interface_state state)
     
     strcpy(new_entry->name, name);
     
-    /* Initialize all interfaces to 0 (no state) */
+    /* Inicializa todas as interfaces para 0 (sem estado) */
     for (int i = 0; i < MAX_INTERFACE; i++) {
         new_entry->interface_states[i] = 0;
     }
     
-    /* Set the state for the specified interface */
+    /* Define o estado para a interface especificada */
     new_entry->interface_states[interface_id] = state;
     
-    /* Add to the list of interest entries */
+    /* Regista o tempo atual */
+    new_entry->timestamp = time(NULL);
+    
+    /* Adiciona à lista de entradas de interesse */
     new_entry->next = node.interest_table;
     node.interest_table = new_entry;
+    
+    printf("Added interest entry for %s with interface %d in state %d\n", 
+           name, interface_id, state);
     
     return 0;
 }
 
 /*
- * Update an interest entry
+ * Atualiza uma entrada de interesse
  */
 int update_interest_entry(char *name, int interface_id, enum interface_state state) {
-    /* Find the entry */
-    InterestEntry *curr = node.interest_table;
-    while (curr != NULL) {
-        if (strcmp(curr->name, name) == 0) {
-            /* Update the state for the specified interface */
-            curr->interface_states[interface_id] = state;
-            return 0;
+    /* Procura a entrada */
+    InterestEntry *entry = find_interest_entry(name);
+    
+    if (entry != NULL) {
+        if (entry->marked_for_removal) {
+            printf("WARNING: Updating interest entry for %s that is marked for removal\n", name);
+            return -1;
         }
-        curr = curr->next;
+        
+        /* Regista a transição de estado para depuração */
+        enum interface_state old_state = entry->interface_states[interface_id];
+        entry->interface_states[interface_id] = state;
+        
+        printf("INTEREST UPDATE: %s - interface %d: %s -> %s\n", 
+               name, interface_id, 
+               state_to_string(old_state), 
+               state_to_string(state));
+        return 0;
     }
     
-    return -1;  /* Entry not found */
+    /* Entrada não encontrada, cria-a */
+    return add_interest_entry(name, interface_id, state);
 }
 
 /*
- * Remove an interest entry
+ * Remove uma entrada de interesse
  */
 int remove_interest_entry(char *name) {
-    /* Find the entry */
+    /* Procura a entrada */
     InterestEntry *prev = NULL;
     InterestEntry *curr = node.interest_table;
     
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            /* Remove from the list */
+            /* Remove da lista */
             if (prev == NULL) {
                 node.interest_table = curr->next;
             } else {
@@ -212,6 +239,7 @@ int remove_interest_entry(char *name) {
             }
             
             free(curr);
+            printf("Removed interest entry for %s\n", name);
             return 0;
         }
         
@@ -219,51 +247,98 @@ int remove_interest_entry(char *name) {
         curr = curr->next;
     }
     
-    return -1;  /* Entry not found */
+    return -1;  /* Entrada não encontrada */
 }
 
 /*
- * Trim leading and trailing whitespace from a string
+ * Remove espaços em branco no início e no fim de uma string
  */
 void trim(char *str) {
     char *start = str;
     char *end;
     
-    /* Trim leading whitespace */
+    /* Remove espaços em branco iniciais */
     while (isspace(*start)) {
         start++;
     }
     
     if (*start == '\0') {
-        /* String is all whitespace */
+        /* String é toda espaços em branco */
         *str = '\0';
         return;
     }
     
-    /* Trim trailing whitespace */
+    /* Remove espaços em branco finais */
     end = start + strlen(start) - 1;
     while (end > start && isspace(*end)) {
         end--;
     }
     
-    /* Null-terminate the trimmed string */
+    /* Termina a string aparada com null */
     *(end + 1) = '\0';
     
-    /* Move the trimmed string to the beginning of the input string */
+    /* Move a string aparada para o início da string de entrada */
     if (start != str) {
         memmove(str, start, (end - start) + 2);
     }
 }
 
 /*
- * Check if a name is valid (alphanumeric and up to MAX_OBJECT_NAME characters)
+ * Procura ou cria uma entrada de interesse
+ */
+/*
+ * Procura ou cria uma entrada de interesse
+ */
+InterestEntry* find_or_create_interest_entry(char *name) {
+    /* Verifica se a entrada já está marcada para remoção */
+    InterestEntry *entry = node.interest_table;
+    while (entry != NULL) {
+        if (strcmp(entry->name, name) == 0) {
+            if (entry->marked_for_removal) {
+                printf("WARNING: Accessing interest entry for %s that is marked for removal\n", name);
+            }
+            return entry;
+        }
+        entry = entry->next;
+    }
+    
+    /* Cria nova entrada se não encontrada */
+    entry = malloc(sizeof(InterestEntry));
+    if (entry == NULL) {
+        perror("malloc");
+        return NULL;
+    }
+    
+    strcpy(entry->name, name);
+    
+    /* Inicializa todas as interfaces para 0 (sem estado) */
+    for (int i = 0; i < MAX_INTERFACE; i++) {
+        entry->interface_states[i] = 0;
+    }
+    
+    /* Inicializa novos campos */
+    entry->timestamp = time(NULL);
+    entry->marked_for_removal = 0;
+    
+    /* Adiciona à lista de entradas de interesse */
+    entry->next = node.interest_table;
+    node.interest_table = entry;
+    
+    printf("INTEREST CREATED: New interest entry for %s\n", name);
+    
+    return entry;
+}
+
+
+/*
+ * Verifica se um nome é válido (alfanumérico e até MAX_OBJECT_NAME caracteres)
  */
 int is_valid_name(char *name) {
     if (name == NULL || strlen(name) == 0 || strlen(name) > MAX_OBJECT_NAME) {
         return 0;
     }
     
-    /* Check if all characters are alphanumeric */
+    /* Verifica se todos os caracteres são alfanuméricos */
     for (int i = 0; name[i]; i++) {
         if (!isalnum(name[i])) {
             return 0;
