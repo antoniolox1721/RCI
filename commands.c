@@ -658,7 +658,7 @@ int cmd_leave()
         free(curr);
         curr = next;
     }
-
+    
     /* Reinicia o estado do nó */
     node.neighbors = NULL;
     node.internal_neighbors = NULL;

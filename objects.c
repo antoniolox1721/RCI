@@ -67,41 +67,87 @@ int remove_object(char *name) {
 /*
  * Adiciona um objeto à cache
  */
+
+/*
+ * Add an object to the cache with strict size limit enforcement
+ */
 int add_to_cache(char *name) {
-    /* Verifica se o objeto já existe na cache */
+    /* Sanity check for input */
+    if (name == NULL || strlen(name) == 0) {
+        fprintf(stderr, "Error: Attempting to cache invalid object name\n");
+        return -1;
+    }
+
+    /* Check if the object already exists in the cache */
     Object *curr = node.cache;
+    Object *prev = NULL;
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            return 0;  /* Objeto já está na cache */
+            /* Object already in cache, no need to add again */
+            return 0;
         }
+        prev = curr;
         curr = curr->next;
     }
     
-    /* Verifica se a cache está cheia */
-    if (node.current_cache_size >= node.cache_size) {
-        /* Remove o objeto mais antigo (primeiro na lista) */
-        if (node.cache != NULL) {
-            Object *oldest = node.cache;
-            node.cache = oldest->next;
-            free(oldest);
-            node.current_cache_size--;
+    /* Ensure cache does not exceed maximum size */
+    while (node.current_cache_size >= node.cache_size) {
+        if (node.cache == NULL) {
+            /* Unexpected state - cache is marked as full but empty */
+            fprintf(stderr, "Warning: Cache size inconsistency detected\n");
+            node.current_cache_size = 0;
+            break;
         }
+        
+        /* Remove the first (oldest) object */
+        Object *oldest = node.cache;
+        node.cache = oldest->next;
+        
+        printf("Cache full. Removing oldest object: %s to make room for %s\n", 
+               oldest->name, name);
+        
+        free(oldest);
+        node.current_cache_size--;
     }
     
-    /* Cria uma nova entrada na cache */
+    /* Create a new cache entry */
     Object *new_object = malloc(sizeof(Object));
     if (new_object == NULL) {
         perror("malloc");
         return -1;
     }
     
-    strcpy(new_object->name, name);
+    /* Copy the name, ensuring no buffer overflow */
+    strncpy(new_object->name, name, MAX_OBJECT_NAME);
+    new_object->name[MAX_OBJECT_NAME] = '\0';  /* Ensure null-termination */
+    new_object->next = NULL;
     
-    /* Adiciona à lista de objetos em cache */
-    new_object->next = node.cache;
-    node.cache = new_object;
+    /* Add to the end of the cached objects list */
+    if (node.cache == NULL) {
+        /* First object in cache */
+        node.cache = new_object;
+    } else {
+        /* Find the last object and append */
+        curr = node.cache;
+        while (curr->next != NULL) {
+            curr = curr->next;
+        }
+        curr->next = new_object;
+    }
+    
+    /* Increment cache size */
     node.current_cache_size++;
     
+    printf("Added object %s to cache (size: %d/%d)\n", 
+           name, node.current_cache_size, node.cache_size);
+    
+    /* Final sanity check to prevent cache size overflow */
+    if (node.current_cache_size > node.cache_size) {
+        fprintf(stderr, "CRITICAL ERROR: Cache size exceeded maximum limit!\n");
+        /* You might want to handle this more gracefully depending on your error handling strategy */
+        exit(EXIT_FAILURE);
+    }
+    if (prev != NULL) { /* Used for traversal, silencing compiler warning */ }
     return 0;
 }
 InterestEntry* find_interest_entry(char *name) {

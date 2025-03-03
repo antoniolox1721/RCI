@@ -79,6 +79,32 @@ void initialize_interest_entry(InterestEntry *entry, char *name)
 }
 
 /**
+ * Updates and propagates safety node information to all neighbors
+ * Should be called whenever the topology changes in a way that affects safety nodes
+ */
+void update_and_propagate_safety_node() {
+    printf("Updating and propagating safety node information\n");
+    
+    /* First, ensure all internal neighbors have updated safety information */
+    Neighbor *n = node.internal_neighbors;
+    while (n != NULL) {
+        char safe_msg[MAX_BUFFER];
+        snprintf(safe_msg, MAX_BUFFER, "SAFE %s %s\n",
+                node.ext_neighbor_ip, node.ext_neighbor_port);
+        
+        printf("Sending updated SAFE message to %s:%s: %s", 
+               n->ip, n->port, safe_msg);
+        
+        if (write(n->fd, safe_msg, strlen(safe_msg)) < 0) {
+            perror("write");
+            /* Continue with other neighbors even if one fails */
+        }
+        
+        n = n->next;
+    }
+}
+
+/**
  * Trata eventos de rede
  * Processa novas ligações e dados recebidos nos sockets de vizinhos
  */
