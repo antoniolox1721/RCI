@@ -82,6 +82,8 @@ typedef struct node {
     char ext_neighbor_port[6];       /* Porto do vizinho externo */
     char safe_node_ip[INET_ADDRSTRLEN];  /* IP do nó de salvaguarda */
     char safe_node_port[6];          /* Porto do nó de salvaguarda */
+    char reg_server_ip[INET_ADDRSTRLEN];  /* IP do servidor de registo */
+    char reg_server_port[6];         /* Porto UDP do servidor de registo */
     int listen_fd;                   /* Descritor de ficheiro para o socket de escuta */
     int reg_fd;                      /* Descritor de ficheiro para o socket do servidor de registo */
     int max_fd;                      /* Descritor de ficheiro máximo para select() */

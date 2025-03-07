@@ -189,10 +189,6 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
     struct addrinfo hints, *res;
     int errcode;
 
-    /* Suprime avisos de parâmetros não utilizados */
-    (void)reg_ip;  /* Usado como valor por defeito se não especificado */
-    (void)reg_udp; /* Usado como valor por defeito se não especificado */
-
     /* Inicializa a estrutura do nó */
     memset(&node, 0, sizeof(Node));
     node.cache_size = cache_size;
@@ -200,6 +196,8 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
     strcpy(node.port, port);
     strcpy(node.ext_neighbor_ip, ip); /* Inicialmente, o vizinho externo é o próprio nó */
     strcpy(node.ext_neighbor_port, port);
+    strcpy(node.reg_server_ip, reg_ip); /* Store registration server IP */
+    snprintf(node.reg_server_port, 6, "%d", reg_udp); /* Store registration server port */
     node.in_network = 0; /* Não está numa rede inicialmente */
     node.max_fd = 0;
 
@@ -263,6 +261,7 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
 
     freeaddrinfo(res);
     printf("Node initialized with IP %s and port %s\n", ip, port);
+    printf("Registration server set to %s:%d\n", reg_ip, reg_udp);
     printf("Enter 'help' for a list of commands\n");
 }
 

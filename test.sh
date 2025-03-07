@@ -239,9 +239,10 @@ script_files=()
 print_header "NDN COMPREHENSIVE TEST"
 
 # Start three nodes
-start_node "Node1" 10 "127.0.0.1" 100
-start_node "Node2" 10 "127.0.0.1" 101
-start_node "Node3" 10 "127.0.0.1" 102
+start_node "Node1" 10 "127.0.0.1" 58001
+start_node "Node2" 10 "127.0.0.1" 58002
+start_node "Node3" 10 "127.0.0.1" 58003
+
 
 # Print test instructions
 print_test_instructions

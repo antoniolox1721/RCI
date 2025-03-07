@@ -314,7 +314,17 @@ int cmd_direct_join(char *connect_ip, char *connect_tcp)
         strcpy(node.ext_neighbor_port, node.port);
         strcpy(node.safe_node_ip, node.ip);
         strcpy(node.safe_node_port, node.port);
-
+        Neighbor *self_neighbor = malloc(sizeof(Neighbor));
+        if (self_neighbor != NULL)
+        {
+            strcpy(self_neighbor->ip, node.ip);
+            strcpy(self_neighbor->port, node.port);
+            self_neighbor->fd = -1;          /* Special fd value to indicate self-connection */
+            self_neighbor->interface_id = 1; /* First interface ID */
+            self_neighbor->next = node.internal_neighbors;
+            node.internal_neighbors = self_neighbor;
+            printf("Added self as internal neighbor\n");
+        }
         printf("Created and joined network %s\n", net);
         return 0;
     }
@@ -500,19 +510,41 @@ int cmd_show_topology()
 {
     printf("Node: %s:%s\n", node.ip, node.port);
     printf("External neighbor: %s:%s\n", node.ext_neighbor_ip, node.ext_neighbor_port);
-    printf("Safety node: %s:%s\n", node.safe_node_ip, node.safe_node_port);
+
+    if (strlen(node.safe_node_ip) > 0)
+    {
+        printf("Safety node: %s:%s", node.safe_node_ip, node.safe_node_port);
+
+        /* Show if this node is its own safety node */
+        if (strcmp(node.safe_node_ip, node.ip) == 0 &&
+            strcmp(node.safe_node_port, node.port) == 0)
+        {
+            printf(" (self)");
+        }
+        printf("\n");
+    }
+    else
+    {
+        printf("Safety node: Not set\n");
+    }
 
     printf("Internal neighbors:\n");
     Neighbor *curr = node.internal_neighbors;
-    while (curr != NULL)
+    if (curr == NULL)
     {
-        printf("  %s:%s\n", curr->ip, curr->port);
-        curr = curr->next;
+        printf("  None\n");
+    }
+    else
+    {
+        while (curr != NULL)
+        {
+            printf("  %s:%s (interface: %d)\n", curr->ip, curr->port, curr->interface_id);
+            curr = curr->next;
+        }
     }
 
     return 0;
 }
-
 /*
  * Mostrar nomes de objetos armazenados
  */
@@ -658,7 +690,7 @@ int cmd_leave()
         free(curr);
         curr = next;
     }
-    
+
     /* Reinicia o estado do nó */
     node.neighbors = NULL;
     node.internal_neighbors = NULL;
