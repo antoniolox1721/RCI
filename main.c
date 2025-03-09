@@ -184,6 +184,15 @@ void handle_user_input()
  * @param reg_ip Endereço IP do servidor de registo
  * @param reg_udp Porto UDP do servidor de registo
  */
+/**
+ * Inicializa o nó
+ * 
+ * @param cache_size Tamanho máximo da cache
+ * @param ip Endereço IP do nó
+ * @param port Porto TCP do nó
+ * @param reg_ip Endereço IP do servidor de registo
+ * @param reg_udp Porto UDP do servidor de registo
+ */
 void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg_udp)
 {
     struct addrinfo hints, *res;
@@ -192,12 +201,28 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
     /* Inicializa a estrutura do nó */
     memset(&node, 0, sizeof(Node));
     node.cache_size = cache_size;
-    strcpy(node.ip, ip);
-    strcpy(node.port, port);
-    strcpy(node.ext_neighbor_ip, ip); /* Inicialmente, o vizinho externo é o próprio nó */
-    strcpy(node.ext_neighbor_port, port);
-    strcpy(node.reg_server_ip, reg_ip); /* Store registration server IP */
-    snprintf(node.reg_server_port, 6, "%d", reg_udp); /* Store registration server port */
+    node.current_cache_size = 0;
+    
+    /* Store local node information */
+    strncpy(node.ip, ip, INET_ADDRSTRLEN-1);
+    node.ip[INET_ADDRSTRLEN-1] = '\0';
+    
+    strncpy(node.port, port, 5);
+    node.port[5] = '\0';
+    
+    /* Initially, the external neighbor is the node itself */
+    strncpy(node.ext_neighbor_ip, ip, INET_ADDRSTRLEN-1);
+    node.ext_neighbor_ip[INET_ADDRSTRLEN-1] = '\0';
+    
+    strncpy(node.ext_neighbor_port, port, 5);
+    node.ext_neighbor_port[5] = '\0';
+    
+    /* Store registration server information */
+    strncpy(node.reg_server_ip, reg_ip, INET_ADDRSTRLEN-1);
+    node.reg_server_ip[INET_ADDRSTRLEN-1] = '\0';
+    
+    snprintf(node.reg_server_port, 6, "%d", reg_udp);
+    
     node.in_network = 0; /* Não está numa rede inicialmente */
     node.max_fd = 0;
 

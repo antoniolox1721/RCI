@@ -116,6 +116,7 @@ void handle_user_input();
 void handle_network_events();
 void handle_registration_response();
 void check_interest_timeouts();
+void check_safety_node_validity();
 
 /**
  * Processamento de comandos

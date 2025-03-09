@@ -222,6 +222,10 @@ void print_help()
  * Aderir a uma rede através do servidor de registo
  * Modificado para validar corretamente o ID da rede e processar a resposta
  */
+/*
+ * Aderir a uma rede através do servidor de registo
+ * Modificado para validar corretamente o ID da rede e processar a resposta
+ */
 int cmd_join(char *net)
 {
     if (node.in_network)
@@ -233,11 +237,12 @@ int cmd_join(char *net)
     /* Verifica se o ID da rede é válido (3 dígitos) */
     if (strlen(net) != 3 || !isdigit(net[0]) || !isdigit(net[1]) || !isdigit(net[2]))
     {
-        printf("Invalid network ID. Must be 3 digits.\n");
+        printf("Invalid network ID. Must be exactly 3 digits.\n");
         return -1;
     }
 
-    printf("Attempting to join network %s\n", net);
+    printf("Attempting to join network %s through registration server %s:%s\n", 
+           net, node.reg_server_ip, node.reg_server_port);
 
     /* Solicita a lista de nós na rede */
     if (send_nodes_request(net) < 0)
@@ -251,12 +256,29 @@ int cmd_join(char *net)
     struct sockaddr_in server_addr;
     socklen_t addr_len = sizeof(server_addr);
 
+    // Set a timeout for the receive operation
+    struct timeval timeout;
+    timeout.tv_sec = 5;  // 5 seconds timeout
+    timeout.tv_usec = 0;
+    if (setsockopt(node.reg_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("setsockopt receive timeout");
+        // Continue anyway, just without timeout
+    }
+
     int bytes_received = recvfrom(node.reg_fd, buffer, MAX_BUFFER - 1, 0,
                                   (struct sockaddr *)&server_addr, &addr_len);
 
     if (bytes_received <= 0)
     {
-        printf("Failed to receive NODESLIST response.\n");
+        if (bytes_received < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                printf("Timeout waiting for response from registration server\n");
+            } else {
+                perror("recvfrom");
+            }
+        } else {
+            printf("Empty response from registration server\n");
+        }
         return -1;
     }
 
@@ -264,7 +286,7 @@ int cmd_join(char *net)
     printf("Received response from server: %s\n", buffer);
 
     /* Verifica se esta é uma resposta NODESLIST para a rede correta */
-    char response_net[4];
+    char response_net[4] = {0};
     if (sscanf(buffer, "NODESLIST %3s", response_net) != 1 || strcmp(response_net, net) != 0)
     {
         printf("Invalid or mismatched NODESLIST response: %s\n", buffer);
@@ -281,6 +303,12 @@ int cmd_join(char *net)
     return 0;
 }
 
+/*
+ * Aderir diretamente a uma rede sem usar o servidor de registo
+ */
+/*
+ * Aderir diretamente a uma rede sem usar o servidor de registo
+ */
 /*
  * Aderir diretamente a uma rede sem usar o servidor de registo
  */
@@ -314,17 +342,7 @@ int cmd_direct_join(char *connect_ip, char *connect_tcp)
         strcpy(node.ext_neighbor_port, node.port);
         strcpy(node.safe_node_ip, node.ip);
         strcpy(node.safe_node_port, node.port);
-        Neighbor *self_neighbor = malloc(sizeof(Neighbor));
-        if (self_neighbor != NULL)
-        {
-            strcpy(self_neighbor->ip, node.ip);
-            strcpy(self_neighbor->port, node.port);
-            self_neighbor->fd = -1;          /* Special fd value to indicate self-connection */
-            self_neighbor->interface_id = 1; /* First interface ID */
-            self_neighbor->next = node.internal_neighbors;
-            node.internal_neighbors = self_neighbor;
-            printf("Added self as internal neighbor\n");
-        }
+
         printf("Created and joined network %s\n", net);
         return 0;
     }
@@ -341,7 +359,7 @@ int cmd_direct_join(char *connect_ip, char *connect_tcp)
     strcpy(node.ext_neighbor_ip, connect_ip);
     strcpy(node.ext_neighbor_port, connect_tcp);
 
-    /* Adiciona o nó como vizinho */
+    /* Adiciona o nó como vizinho externo - use the specified port from the command */
     add_neighbor(connect_ip, connect_tcp, fd, 1);
 
     /* Envia mensagem ENTRY */

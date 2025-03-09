@@ -13,7 +13,10 @@
 /**
  * Protocolo de registo
  */
-
+int update_neighbor_info(int fd, char *ip, char *port);
+/* Forward declarations of functions defined later in the file */
+int remove_neighbor(int fd);
+int handle_external_neighbor_disconnect(char *removed_ip, char *removed_port);
 /**
  * Envia uma mensagem de registo ao servidor de registo
  * 
