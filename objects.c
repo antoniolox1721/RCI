@@ -7,8 +7,12 @@
 
 #include "objects.h"
 #include "debug_utils.h"
-/*
- * Adiciona um objeto
+
+/**
+ * Adiciona um objeto.
+ * 
+ * @param name Nome do objeto a adicionar
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int add_object(char *name) {
     /* Verifica se o objeto já existe */
@@ -36,8 +40,11 @@ int add_object(char *name) {
     return 0;
 }
 
-/*
- * Remove um objeto
+/**
+ * Remove um objeto.
+ * 
+ * @param name Nome do objeto a remover
+ * @return 0 em caso de sucesso, -1 se o objeto não for encontrado
  */
 int remove_object(char *name) {
     /* Procura o objeto */
@@ -64,42 +71,41 @@ int remove_object(char *name) {
     return -1;  /* Objeto não encontrado */
 }
 
-/*
- * Adiciona um objeto à cache
- */
-
-/*
- * Add an object to the cache with strict size limit enforcement
+/**
+ * Adiciona um objeto à cache com limite de tamanho rigoroso.
+ * 
+ * @param name Nome do objeto a adicionar à cache
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int add_to_cache(char *name) {
-    /* Sanity check for input */
+    /* Verifica validade da entrada */
     if (name == NULL || strlen(name) == 0) {
         fprintf(stderr, "Error: Attempting to cache invalid object name\n");
         return -1;
     }
 
-    /* Check if the object already exists in the cache */
+    /* Verifica se o objeto já existe na cache */
     Object *curr = node.cache;
     Object *prev = NULL;
     while (curr != NULL) {
         if (strcmp(curr->name, name) == 0) {
-            /* Object already in cache, no need to add again */
+            /* Objeto já na cache, não é necessário adicionar novamente */
             return 0;
         }
         prev = curr;
         curr = curr->next;
     }
     
-    /* Ensure cache does not exceed maximum size */
+    /* Garante que a cache não excede o tamanho máximo */
     while (node.current_cache_size >= node.cache_size) {
         if (node.cache == NULL) {
-            /* Unexpected state - cache is marked as full but empty */
+            /* Estado inesperado - cache está marcada como cheia mas vazia */
             fprintf(stderr, "Warning: Cache size inconsistency detected\n");
             node.current_cache_size = 0;
             break;
         }
         
-        /* Remove the first (oldest) object */
+        /* Remove o primeiro (mais antigo) objeto */
         Object *oldest = node.cache;
         node.cache = oldest->next;
         
@@ -110,24 +116,24 @@ int add_to_cache(char *name) {
         node.current_cache_size--;
     }
     
-    /* Create a new cache entry */
+    /* Cria uma nova entrada na cache */
     Object *new_object = malloc(sizeof(Object));
     if (new_object == NULL) {
         perror("malloc");
         return -1;
     }
     
-    /* Copy the name, ensuring no buffer overflow */
+    /* Copia o nome, garantindo que não há overflow no buffer */
     strncpy(new_object->name, name, MAX_OBJECT_NAME);
-    new_object->name[MAX_OBJECT_NAME] = '\0';  /* Ensure null-termination */
+    new_object->name[MAX_OBJECT_NAME] = '\0';  /* Garante terminação com null */
     new_object->next = NULL;
     
-    /* Add to the end of the cached objects list */
+    /* Adiciona ao fim da lista de objetos em cache */
     if (node.cache == NULL) {
-        /* First object in cache */
+        /* Primeiro objeto na cache */
         node.cache = new_object;
     } else {
-        /* Find the last object and append */
+        /* Encontra o último objeto e adiciona */
         curr = node.cache;
         while (curr->next != NULL) {
             curr = curr->next;
@@ -135,21 +141,28 @@ int add_to_cache(char *name) {
         curr->next = new_object;
     }
     
-    /* Increment cache size */
+    /* Incrementa o tamanho da cache */
     node.current_cache_size++;
     
     printf("Added object %s to cache (size: %d/%d)\n", 
            name, node.current_cache_size, node.cache_size);
     
-    /* Final sanity check to prevent cache size overflow */
+    /* Verificação final para prevenir overflow do tamanho da cache */
     if (node.current_cache_size > node.cache_size) {
         fprintf(stderr, "CRITICAL ERROR: Cache size exceeded maximum limit!\n");
-        /* You might want to handle this more gracefully depending on your error handling strategy */
+        /* Pode querer tratar isto de forma mais elegante dependendo da estratégia de tratamento de erros */
         exit(EXIT_FAILURE);
     }
-    if (prev != NULL) { /* Used for traversal, silencing compiler warning */ }
+    if (prev != NULL) { /* Usado para travessia, silencia aviso do compilador */ }
     return 0;
 }
+
+/**
+ * Procura uma entrada na tabela de interesses.
+ * 
+ * @param name Nome do objeto associado à entrada de interesse
+ * @return Apontador para a entrada se encontrada, NULL caso contrário
+ */
 InterestEntry* find_interest_entry(char *name) {
     InterestEntry *entry = node.interest_table;
     
@@ -162,8 +175,12 @@ InterestEntry* find_interest_entry(char *name) {
     
     return NULL;
 }
-/*
- * Procura um objeto pelo nome
+
+/**
+ * Procura um objeto pelo nome.
+ * 
+ * @param name Nome do objeto a procurar
+ * @return 0 se o objeto for encontrado, -1 caso contrário
  */
 int find_object(char *name) {
     /* Procura na lista de objetos */
@@ -178,8 +195,11 @@ int find_object(char *name) {
     return -1;  /* Objeto não encontrado */
 }
 
-/*
- * Procura um objeto na cache
+/**
+ * Procura um objeto na cache.
+ * 
+ * @param name Nome do objeto a procurar na cache
+ * @return 0 se o objeto for encontrado, -1 caso contrário
  */
 int find_in_cache(char *name) {
     /* Procura na cache */
@@ -194,8 +214,13 @@ int find_in_cache(char *name) {
     return -1;  /* Objeto não encontrado na cache */
 }
 
-/*
- * Adiciona uma entrada de interesse
+/**
+ * Adiciona uma entrada de interesse.
+ * 
+ * @param name Nome do objeto associado ao interesse
+ * @param interface_id ID da interface a atualizar
+ * @param state Estado a definir para a interface (RESPONSE, WAITING ou CLOSED)
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int add_interest_entry(char *name, int interface_id, enum interface_state state) {
     /* Verifica se a entrada já existe */
@@ -239,8 +264,13 @@ int add_interest_entry(char *name, int interface_id, enum interface_state state)
     return 0;
 }
 
-/*
- * Atualiza uma entrada de interesse
+/**
+ * Atualiza uma entrada de interesse.
+ * 
+ * @param name Nome do objeto associado ao interesse
+ * @param interface_id ID da interface a atualizar
+ * @param state Novo estado para a interface (RESPONSE, WAITING ou CLOSED)
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int update_interest_entry(char *name, int interface_id, enum interface_state state) {
     /* Procura a entrada */
@@ -267,8 +297,11 @@ int update_interest_entry(char *name, int interface_id, enum interface_state sta
     return add_interest_entry(name, interface_id, state);
 }
 
-/*
- * Remove uma entrada de interesse
+/**
+ * Remove uma entrada de interesse.
+ * 
+ * @param name Nome do objeto associado à entrada a remover
+ * @return 0 em caso de sucesso, -1 se a entrada não for encontrada
  */
 int remove_interest_entry(char *name) {
     /* Procura a entrada */
@@ -296,8 +329,10 @@ int remove_interest_entry(char *name) {
     return -1;  /* Entrada não encontrada */
 }
 
-/*
- * Remove espaços em branco no início e no fim de uma string
+/**
+ * Remove espaços em branco no início e no fim de uma string.
+ * 
+ * @param str String a ser aparada
  */
 void trim(char *str) {
     char *start = str;
@@ -329,11 +364,11 @@ void trim(char *str) {
     }
 }
 
-/*
- * Procura ou cria uma entrada de interesse
- */
-/*
- * Procura ou cria uma entrada de interesse
+/**
+ * Procura ou cria uma entrada de interesse.
+ * 
+ * @param name Nome do objeto associado à entrada de interesse
+ * @return Apontador para a entrada existente ou nova, NULL em caso de erro
  */
 InterestEntry* find_or_create_interest_entry(char *name) {
     /* Verifica se a entrada já está marcada para remoção */
@@ -375,9 +410,11 @@ InterestEntry* find_or_create_interest_entry(char *name) {
     return entry;
 }
 
-
-/*
- * Verifica se um nome é válido (alfanumérico e até MAX_OBJECT_NAME caracteres)
+/**
+ * Verifica se um nome é válido (alfanumérico e até MAX_OBJECT_NAME caracteres).
+ * 
+ * @param name Nome a verificar
+ * @return 1 se o nome for válido, 0 caso contrário
  */
 int is_valid_name(char *name) {
     if (name == NULL || strlen(name) == 0 || strlen(name) > MAX_OBJECT_NAME) {

@@ -28,7 +28,7 @@
 #define INTEREST_TIMEOUT 10    /* Tempo limite para mensagens de interesse (em segundos) */
 
 /**
- * Enumeração de estados possíveis para cada interface na tabela de interesses
+ * Enumeração de estados possíveis para cada interface na tabela de interesses.
  * Cada interface em relação a um pedido pode estar num dos seguintes estados:
  */
 enum interface_state {
@@ -38,8 +38,8 @@ enum interface_state {
 };
 
 /**
- * Estrutura que representa um objeto na rede NDN
- * Cada objeto tem um nome único e está ligado numa lista ligada
+ * Estrutura que representa um objeto na rede NDN.
+ * Cada objeto tem um nome único e está ligado numa lista ligada.
  */
 typedef struct object {
     char name[MAX_OBJECT_NAME + 1];  /* Nome do objeto (com espaço para o terminador nulo) */
@@ -47,8 +47,8 @@ typedef struct object {
 } Object;
 
 /**
- * Estrutura que representa uma entrada na tabela de interesses
- * Cada entrada contém informação sobre um interesse em curso para um objeto
+ * Estrutura que representa uma entrada na tabela de interesses.
+ * Cada entrada contém informação sobre um interesse em curso para um objeto.
  */
 typedef struct interest_entry {
     char name[MAX_OBJECT_NAME + 1];  /* Nome do objeto pretendido */
@@ -60,8 +60,8 @@ typedef struct interest_entry {
 
 
 /**
- * Estrutura que representa um vizinho na rede NDN
- * Cada vizinho está ligado através de uma sessão TCP
+ * Estrutura que representa um vizinho na rede NDN.
+ * Cada vizinho está ligado através de uma sessão TCP.
  */
 typedef struct neighbor {
     char ip[INET_ADDRSTRLEN];  /* Endereço IP do vizinho */
@@ -72,8 +72,8 @@ typedef struct neighbor {
 } Neighbor;
 
 /**
- * Estrutura principal que representa o estado do nó
- * Contém toda a informação necessária para o funcionamento do nó na rede NDN
+ * Estrutura principal que representa o estado do nó.
+ * Contém toda a informação necessária para o funcionamento do nó na rede NDN.
  */
 typedef struct node {
     char ip[INET_ADDRSTRLEN];        /* Endereço IP do nó */
@@ -105,23 +105,74 @@ extern Node node;
 /**
  * Funções de inicialização e limpeza
  */
+
+/**
+ * Inicializa o nó com as configurações especificadas.
+ * 
+ * @param cache_size Tamanho máximo da cache
+ * @param ip Endereço IP do nó
+ * @param port Porto TCP do nó
+ * @param reg_ip Endereço IP do servidor de registo
+ * @param reg_udp Porto UDP do servidor de registo
+ */
 void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg_udp);
+
+/**
+ * Limpa todos os recursos alocados e termina o programa.
+ */
 void cleanup_and_exit();
+
+/**
+ * Manipulador para o sinal SIGINT (Ctrl+C).
+ * 
+ * @param sig Número do sinal recebido
+ */
 void handle_sigint(int sig);
 
 /**
  * Manipuladores de eventos
  */
+
+/**
+ * Trata a entrada do utilizador através da linha de comandos.
+ */
 void handle_user_input();
+
+/**
+ * Trata eventos de rede (novas ligações, dados recebidos, etc.).
+ */
 void handle_network_events();
+
+/**
+ * Processa respostas recebidas do servidor de registo.
+ */
 void handle_registration_response();
+
+/**
+ * Verifica e processa interesses que excederam o tempo limite.
+ */
 void check_interest_timeouts();
+
+/**
+ * Verifica a validade do nó de salvaguarda.
+ */
 void check_safety_node_validity();
 
 /**
  * Processamento de comandos
  */
+
+/**
+ * Processa um comando introduzido pelo utilizador.
+ * 
+ * @param cmd String contendo o comando a processar
+ * @return 0 em caso de sucesso, -1 em caso de erro
+ */
 int process_command(char *cmd);
+
+/**
+ * Mostra informações de ajuda sobre os comandos disponíveis.
+ */
 void print_help();
 
 #endif /* NDN_H */

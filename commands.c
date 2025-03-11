@@ -10,8 +10,8 @@
 #include "objects.h"
 #include "debug_utils.h"
 
-/*
- * Processa um comando do utilizador
+/**
+ * Processa um comando do utilizador.
  *
  * @param cmd String contendo o comando a processar
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -198,9 +198,9 @@ int process_command(char *cmd)
     return -1;
 }
 
-/*
- * Imprime informações de ajuda
- * Mostra todos os comandos disponíveis e suas descrições
+/**
+ * Imprime informações de ajuda.
+ * Mostra todos os comandos disponíveis e suas descrições.
  */
 void print_help()
 {
@@ -218,13 +218,12 @@ void print_help()
     printf("  help (h)                              - Show this help message\n");
 }
 
-/*
- * Aderir a uma rede através do servidor de registo
- * Modificado para validar corretamente o ID da rede e processar a resposta
- */
-/*
- * Aderir a uma rede através do servidor de registo
- * Modificado para validar corretamente o ID da rede e processar a resposta
+/**
+ * Aderir a uma rede através do servidor de registo.
+ * Modificado para validar corretamente o ID da rede e processar a resposta.
+ * 
+ * @param net ID da rede (três dígitos)
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_join(char *net)
 {
@@ -256,13 +255,13 @@ int cmd_join(char *net)
     struct sockaddr_in server_addr;
     socklen_t addr_len = sizeof(server_addr);
 
-    // Set a timeout for the receive operation
+    // Define um timeout para a operação de receção
     struct timeval timeout;
-    timeout.tv_sec = 5;  // 5 seconds timeout
+    timeout.tv_sec = 5;  // 5 segundos timeout
     timeout.tv_usec = 0;
     if (setsockopt(node.reg_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt receive timeout");
-        // Continue anyway, just without timeout
+        // Continua de qualquer forma, apenas sem timeout
     }
 
     int bytes_received = recvfrom(node.reg_fd, buffer, MAX_BUFFER - 1, 0,
@@ -303,14 +302,12 @@ int cmd_join(char *net)
     return 0;
 }
 
-/*
- * Aderir diretamente a uma rede sem usar o servidor de registo
- */
-/*
- * Aderir diretamente a uma rede sem usar o servidor de registo
- */
-/*
- * Aderir diretamente a uma rede sem usar o servidor de registo
+/**
+ * Aderir diretamente a uma rede sem usar o servidor de registo.
+ * 
+ * @param connect_ip Endereço IP do nó a ligar
+ * @param connect_tcp Porto TCP do nó a ligar
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_direct_join(char *connect_ip, char *connect_tcp)
 {
@@ -359,7 +356,7 @@ int cmd_direct_join(char *connect_ip, char *connect_tcp)
     strcpy(node.ext_neighbor_ip, connect_ip);
     strcpy(node.ext_neighbor_port, connect_tcp);
 
-    /* Adiciona o nó como vizinho externo - use the specified port from the command */
+    /* Adiciona o nó como vizinho externo - usa o porto especificado no comando */
     add_neighbor(connect_ip, connect_tcp, fd, 1);
 
     /* Envia mensagem ENTRY */
@@ -386,8 +383,11 @@ int cmd_direct_join(char *connect_ip, char *connect_tcp)
     return 0;
 }
 
-/*
- * Criar um objeto
+/**
+ * Criar um objeto.
+ * 
+ * @param name Nome do objeto a criar
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_create(char *name)
 {
@@ -414,8 +414,11 @@ int cmd_create(char *name)
     return 0;
 }
 
-/*
- * Eliminar um objeto
+/**
+ * Eliminar um objeto.
+ * 
+ * @param name Nome do objeto a eliminar
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_delete(char *name)
 {
@@ -435,9 +438,12 @@ int cmd_delete(char *name)
     return 0;
 }
 
-/*
- * Obter um objeto
- * Procura localmente e, se não encontrar, envia interesse pela rede
+/**
+ * Obter um objeto.
+ * Procura localmente e, se não encontrar, envia interesse pela rede.
+ * 
+ * @param name Nome do objeto a obter
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_retrieve(char *name)
 {
@@ -521,8 +527,10 @@ int cmd_retrieve(char *name)
     return 0;
 }
 
-/*
- * Mostrar a topologia da rede
+/**
+ * Mostrar a topologia da rede.
+ * 
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_show_topology()
 {
@@ -533,7 +541,7 @@ int cmd_show_topology()
     {
         printf("Safety node: %s:%s", node.safe_node_ip, node.safe_node_port);
 
-        /* Show if this node is its own safety node */
+        /* Mostra se este nó é o seu próprio nó de salvaguarda */
         if (strcmp(node.safe_node_ip, node.ip) == 0 &&
             strcmp(node.safe_node_port, node.port) == 0)
         {
@@ -563,8 +571,11 @@ int cmd_show_topology()
 
     return 0;
 }
-/*
- * Mostrar nomes de objetos armazenados
+
+/**
+ * Mostrar nomes de objetos armazenados.
+ * 
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_show_names()
 {
@@ -587,8 +598,10 @@ int cmd_show_names()
     return 0;
 }
 
-/*
- * Mostrar a tabela de interesses
+/**
+ * Mostrar a tabela de interesses.
+ * 
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_show_interest_table()
 {
@@ -619,8 +632,10 @@ int cmd_show_interest_table()
     return 0;
 }
 
-/*
- * Sair da rede
+/**
+ * Sair da rede.
+ * 
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_leave()
 {
@@ -722,8 +737,10 @@ int cmd_leave()
     return 0;
 }
 
-/*
- * Sair da aplicação
+/**
+ * Sair da aplicação.
+ * 
+ * @return 0 em caso de sucesso (nunca retorna na realidade, pois termina o programa)
  */
 int cmd_exit()
 {

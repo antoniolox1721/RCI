@@ -16,7 +16,7 @@
 Node node;
 
 /**
- * Função principal
+ * Função principal.
  * 
  * @param argc Número de argumentos da linha de comandos
  * @param argv Array de strings com os argumentos da linha de comandos
@@ -60,8 +60,8 @@ int main(int argc, char *argv[])
     initialize_node(cache_size, ip, port, reg_ip, reg_udp);
 
     /**
-     * Ciclo principal
-     * Monitoriza eventos de entrada do utilizador e eventos de rede
+     * Ciclo principal.
+     * Monitoriza eventos de entrada do utilizador e eventos de rede.
      */
     while (1)
     {
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
 }
 
 /**
- * Manipulador de sinal para SIGINT (Ctrl+C)
+ * Manipulador de sinal para SIGINT (Ctrl+C).
  * 
  * @param sig Número do sinal recebido
  */
@@ -139,7 +139,7 @@ void handle_sigint(int sig)
 }
 
 /**
- * Trata a entrada do utilizador através da linha de comandos
+ * Trata a entrada do utilizador através da linha de comandos.
  */
 void handle_user_input()
 {
@@ -176,16 +176,7 @@ void handle_user_input()
 }
 
 /**
- * Inicializa o nó
- * 
- * @param cache_size Tamanho máximo da cache
- * @param ip Endereço IP do nó
- * @param port Porto TCP do nó
- * @param reg_ip Endereço IP do servidor de registo
- * @param reg_udp Porto UDP do servidor de registo
- */
-/**
- * Inicializa o nó
+ * Inicializa o nó.
  * 
  * @param cache_size Tamanho máximo da cache
  * @param ip Endereço IP do nó
@@ -203,21 +194,21 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
     node.cache_size = cache_size;
     node.current_cache_size = 0;
     
-    /* Store local node information */
+    /* Armazena informações do nó local */
     strncpy(node.ip, ip, INET_ADDRSTRLEN-1);
     node.ip[INET_ADDRSTRLEN-1] = '\0';
     
     strncpy(node.port, port, 5);
     node.port[5] = '\0';
     
-    /* Initially, the external neighbor is the node itself */
+    /* Inicialmente, o vizinho externo é o próprio nó */
     strncpy(node.ext_neighbor_ip, ip, INET_ADDRSTRLEN-1);
     node.ext_neighbor_ip[INET_ADDRSTRLEN-1] = '\0';
     
     strncpy(node.ext_neighbor_port, port, 5);
     node.ext_neighbor_port[5] = '\0';
     
-    /* Store registration server information */
+    /* Armazena informações do servidor de registo */
     strncpy(node.reg_server_ip, reg_ip, INET_ADDRSTRLEN-1);
     node.reg_server_ip[INET_ADDRSTRLEN-1] = '\0';
     
@@ -291,8 +282,8 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
 }
 
 /**
- * Limpa recursos e sai do programa
- * Fecha todos os sockets e liberta a memória alocada
+ * Limpa recursos e sai do programa.
+ * Fecha todos os sockets e liberta a memória alocada.
  */
 void cleanup_and_exit()
 {

@@ -13,12 +13,36 @@
 /**
  * Protocolo de registo
  */
-int update_neighbor_info(int fd, char *ip, char *port);
-/* Forward declarations of functions defined later in the file */
-int remove_neighbor(int fd);
-int handle_external_neighbor_disconnect(char *removed_ip, char *removed_port);
+
 /**
- * Envia uma mensagem de registo ao servidor de registo
+ * Atualiza as informações de um vizinho com o porto de escuta correto.
+ * 
+ * @param fd Descritor de ficheiro da ligação
+ * @param ip Endereço IP do vizinho
+ * @param port Porto de escuta do vizinho
+ * @return 0 em caso de sucesso, -1 em caso de erro
+ */
+int update_neighbor_info(int fd, char *ip, char *port);
+
+/**
+ * Remove um vizinho da lista de vizinhos.
+ * 
+ * @param fd Descritor de ficheiro da ligação
+ * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
+ */
+int remove_neighbor(int fd);
+
+/**
+ * Trata a desconexão de um vizinho externo.
+ * 
+ * @param removed_ip Endereço IP do vizinho removido
+ * @param removed_port Porto TCP do vizinho removido
+ * @return 0 em caso de sucesso, -1 em caso de erro
+ */
+int handle_external_neighbor_disconnect(char *removed_ip, char *removed_port);
+
+/**
+ * Envia uma mensagem de registo ao servidor de registo.
  * 
  * @param net ID da rede (três dígitos)
  * @param ip Endereço IP do nó
@@ -28,7 +52,7 @@ int handle_external_neighbor_disconnect(char *removed_ip, char *removed_port);
 int send_reg_message(char *net, char *ip, char *port);
 
 /**
- * Envia uma mensagem de remoção de registo ao servidor de registo
+ * Envia uma mensagem de remoção de registo ao servidor de registo.
  * 
  * @param net ID da rede (três dígitos)
  * @param ip Endereço IP do nó
@@ -38,7 +62,7 @@ int send_reg_message(char *net, char *ip, char *port);
 int send_unreg_message(char *net, char *ip, char *port);
 
 /**
- * Envia um pedido de lista de nós ao servidor de registo
+ * Envia um pedido de lista de nós ao servidor de registo.
  * 
  * @param net ID da rede (três dígitos)
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -46,7 +70,7 @@ int send_unreg_message(char *net, char *ip, char *port);
 int send_nodes_request(char *net);
 
 /**
- * Processa a resposta NODESLIST do servidor de registo
+ * Processa a resposta NODESLIST do servidor de registo.
  * 
  * @param buffer Buffer contendo a resposta NODESLIST
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -58,7 +82,7 @@ int process_nodeslist_response(char *buffer);
  */
 
 /**
- * Envia uma mensagem ENTRY para um nó
+ * Envia uma mensagem ENTRY para um nó.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó emissor
@@ -68,7 +92,7 @@ int process_nodeslist_response(char *buffer);
 int send_entry_message(int fd, char *ip, char *port);
 
 /**
- * Envia uma mensagem SAFE para um nó
+ * Envia uma mensagem SAFE para um nó.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó de salvaguarda
@@ -78,7 +102,7 @@ int send_entry_message(int fd, char *ip, char *port);
 int send_safe_message(int fd, char *ip, char *port);
 
 /**
- * Processa uma mensagem ENTRY recebida
+ * Processa uma mensagem ENTRY recebida.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó emissor
@@ -88,7 +112,7 @@ int send_safe_message(int fd, char *ip, char *port);
 int handle_entry_message(int fd, char *ip, char *port);
 
 /**
- * Processa uma mensagem SAFE recebida
+ * Processa uma mensagem SAFE recebida.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó de salvaguarda
@@ -102,7 +126,7 @@ int handle_safe_message(int fd, char *ip, char *port);
  */
 
 /**
- * Envia uma mensagem de interesse para um objeto
+ * Envia uma mensagem de interesse para um objeto.
  * 
  * @param name Nome do objeto pretendido
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -110,7 +134,7 @@ int handle_safe_message(int fd, char *ip, char *port);
 int send_interest_message(char *name);
 
 /**
- * Envia uma mensagem de objeto como resposta a um interesse
+ * Envia uma mensagem de objeto como resposta a um interesse.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto
@@ -119,7 +143,7 @@ int send_interest_message(char *name);
 int send_object_message(int fd, char *name);
 
 /**
- * Envia uma mensagem NOOBJECT quando um objeto não é encontrado
+ * Envia uma mensagem NOOBJECT quando um objeto não é encontrado.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto não encontrado
@@ -128,7 +152,7 @@ int send_object_message(int fd, char *name);
 int send_noobject_message(int fd, char *name);
 
 /**
- * Processa uma mensagem de interesse recebida
+ * Processa uma mensagem de interesse recebida.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto pretendido
@@ -137,7 +161,7 @@ int send_noobject_message(int fd, char *name);
 int handle_interest_message(int fd, char *name);
 
 /**
- * Processa uma mensagem de objeto recebida
+ * Processa uma mensagem de objeto recebida.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto recebido
@@ -146,7 +170,7 @@ int handle_interest_message(int fd, char *name);
 int handle_object_message(int fd, char *name);
 
 /**
- * Processa uma mensagem NOOBJECT recebida
+ * Processa uma mensagem NOOBJECT recebida.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto não encontrado
@@ -159,7 +183,7 @@ int handle_noobject_message(int fd, char *name);
  */
 
 /**
- * Verifica e processa interesses que excederam o tempo limite
+ * Verifica e processa interesses que excederam o tempo limite.
  */
 void check_interest_timeouts();
 
@@ -168,7 +192,7 @@ void check_interest_timeouts();
  */
 
 /**
- * Processa respostas recebidas do servidor de registo
+ * Processa respostas recebidas do servidor de registo.
  */
 void handle_registration_response();
 
@@ -177,16 +201,22 @@ void handle_registration_response();
  */
 
 /**
- * Processa eventos de rede (novas ligações, dados recebidos, etc.)
+ * Processa eventos de rede (novas ligações, dados recebidos, etc.).
  */
 void handle_network_events();
+
+/**
+ * Atualiza e propaga informações do nó de salvaguarda para todos os vizinhos internos.
+ * Deve ser chamada sempre que a topologia muda de forma a afetar os nós de salvaguarda.
+ */
+void update_and_propagate_safety_node();
 
 /**
  * Utilidades de rede
  */
 
 /**
- * Estabelece uma ligação TCP com um nó
+ * Estabelece uma ligação TCP com um nó.
  * 
  * @param ip Endereço IP do nó destino
  * @param port Porto TCP do nó destino
@@ -195,7 +225,7 @@ void handle_network_events();
 int connect_to_node(char *ip, char *port);
 
 /**
- * Adiciona um vizinho à lista de vizinhos
+ * Adiciona um vizinho à lista de vizinhos.
  * 
  * @param ip Endereço IP do vizinho
  * @param port Porto TCP do vizinho
@@ -206,13 +236,18 @@ int connect_to_node(char *ip, char *port);
 int add_neighbor(char *ip, char *port, int fd, int is_external);
 
 /**
- * Remove um vizinho da lista de vizinhos
+ * Reinicia o interesse para um objeto, removendo a sua entrada.
  * 
- * @param fd Descritor de ficheiro da ligação
- * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
+ * @param name Nome do objeto associado ao interesse a reiniciar
  */
-int remove_neighbor(int fd);
+void reset_interest_for_object(char *name);
 
-
+/**
+ * Inicializa uma entrada de interesse.
+ *
+ * @param entry Apontador para a entrada de interesse a inicializar
+ * @param name Nome do objeto associado à entrada
+ */
+void initialize_interest_entry(InterestEntry *entry, char *name);
 
 #endif /* NETWORK_H */

@@ -27,12 +27,12 @@ typedef enum {
 extern LogLevel current_log_level;
 
 /**
- * Imprime informação sobre a tabela de interesses - útil para depuração
+ * Imprime informação sobre a tabela de interesses - útil para depuração.
  */
 void debug_interest_table(void);
 
 /**
- * Regista uma mensagem se o nível de registo atual for >= ao nível especificado
+ * Regista uma mensagem se o nível de registo atual for >= ao nível especificado.
  * 
  * @param level Nível de registo da mensagem
  * @param format Formato da mensagem (estilo printf)
@@ -41,29 +41,29 @@ void debug_interest_table(void);
 void log_message(LogLevel level, const char *format, ...);
 
 /**
- * Imprime informação detalhada sobre a tabela de interesses - útil para depuração
+ * Imprime informação detalhada sobre a tabela de interesses - útil para depuração.
  */
 void dump_interest_table();
 
 /**
- * Imprime informação detalhada sobre os vizinhos - útil para depuração
+ * Imprime informação detalhada sobre os vizinhos - útil para depuração.
  */
 void dump_neighbors();
 
 /**
- * Imprime informação detalhada sobre os objetos e cache - útil para depuração
+ * Imprime informação detalhada sobre os objetos e cache - útil para depuração.
  */
 void dump_objects();
 
 /**
- * Ativa ou desativa o modo de depuração
+ * Ativa ou desativa o modo de depuração.
  * 
  * @param enable 1 para ativar, 0 para desativar
  */
 void set_debug_mode(int enable);
 
 /**
- * Obtém a representação em string de um valor de estado
+ * Obtém a representação em string de um valor de estado.
  * 
  * @param state Estado a converter para string
  * @return String representativa do estado
@@ -71,7 +71,17 @@ void set_debug_mode(int enable);
 const char* state_to_string(enum interface_state state);
 
 /**
- * Valida a integridade da tabela de interesses
+ * Imprime informação sobre mudanças de estado para uma interface de interesse.
+ * 
+ * @param name Nome do objeto associado ao interesse
+ * @param interface_id ID da interface
+ * @param old_state Estado antigo da interface
+ * @param new_state Novo estado da interface
+ */
+void print_interest_state(char *name, int interface_id, enum interface_state old_state, enum interface_state new_state);
+
+/**
+ * Valida a integridade da tabela de interesses.
  * 
  * @return 1 se válida, 0 se foram encontrados problemas
  */

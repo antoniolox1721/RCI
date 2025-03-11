@@ -10,7 +10,7 @@
 #include "debug_utils.h"
 
 /**
- * Reinicia o interesse para um objeto, removendo a sua entrada
+ * Reinicia o interesse para um objeto, removendo a sua entrada.
  *
  * @param name Nome do objeto associado ao interesse a reiniciar
  */
@@ -57,35 +57,37 @@ void reset_interest_for_object(char *name)
 
     printf("INTEREST RESET: No entry found for %s\n", name);
 }
+
 /**
- * Updates a neighbor's information with the correct listening port
- * This is called when we receive an ENTRY message and need to update the port
+ * Atualiza as informações de um vizinho com o porto de escuta correto.
+ * Esta função é chamada quando recebemos uma mensagem ENTRY e precisamos
+ * de atualizar o porto.
  *
- * @param fd The file descriptor of the connection
- * @param ip The IP address from the ENTRY message
- * @param port The listening port from the ENTRY message
- * @return 0 on success, -1 if neighbor not found
+ * @param fd O descritor de ficheiro da ligação
+ * @param ip O endereço IP da mensagem ENTRY
+ * @param port O porto de escuta da mensagem ENTRY
+ * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
  */
 int update_neighbor_info(int fd, char *ip, char *port) {
     Neighbor *curr = node.neighbors;
     int found = 0;
     
-    /* Find the neighbor with this fd */
+    /* Procura o vizinho com este fd */
     while (curr != NULL) {
         if (curr->fd == fd) {
-            /* Update the port to the one specified in the ENTRY message */
+            /* Atualiza o porto para o que foi especificado na mensagem ENTRY */
             if (strcmp(curr->port, port) != 0) {
                 printf("Updating neighbor port from %s to %s for connection fd %d\n", 
                        curr->port, port, fd);
                 strcpy(curr->port, port);
             }
             
-            /* Add as internal neighbor if not already */
+            /* Adiciona como vizinho interno se não for já */
             int already_internal = 0;
             Neighbor *internal = node.internal_neighbors;
             while (internal != NULL) {
                 if (internal->fd == fd) {
-                    /* Update the internal neighbor's port as well */
+                    /* Atualiza o porto do vizinho interno também */
                     if (strcmp(internal->port, port) != 0) {
                         strcpy(internal->port, port);
                     }
@@ -96,7 +98,7 @@ int update_neighbor_info(int fd, char *ip, char *port) {
             }
             
             if (!already_internal) {
-                /* Add to internal neighbors list */
+                /* Adiciona à lista de vizinhos internos */
                 Neighbor *internal_copy = malloc(sizeof(Neighbor));
                 if (internal_copy != NULL) {
                     memcpy(internal_copy, curr, sizeof(Neighbor));
@@ -119,8 +121,9 @@ int update_neighbor_info(int fd, char *ip, char *port) {
     
     return 0;
 }
+
 /**
- * Inicializa uma entrada de interesse
+ * Inicializa uma entrada de interesse.
  *
  * @param entry Apontador para a entrada de interesse a inicializar
  * @param name Nome do objeto associado à entrada
@@ -140,12 +143,8 @@ void initialize_interest_entry(InterestEntry *entry, char *name)
 }
 
 /**
- * Updates and propagates safety node information to all internal neighbors
- * Should be called whenever the topology changes in a way that affects safety nodes
- */
-/**
- * Updates and propagates safety node information to all internal neighbors
- * Should be called whenever the topology changes in a way that affects safety nodes
+ * Atualiza e propaga informações de nó de salvaguarda a todos os vizinhos internos.
+ * Deve ser chamada sempre que a topologia muda de forma a afetar nós de salvaguarda.
  */
 void update_and_propagate_safety_node() {
     printf("SAFETY: Updating and propagating safety node information\n");
@@ -156,30 +155,25 @@ void update_and_propagate_safety_node() {
     int sent_count = 0;
     Neighbor *n = node.internal_neighbors;
     while (n != NULL) {
-        /* Check if interface ID is valid - similar to interest message propagation */
-        if (n->interface_id > 0) {
-            /* Create the SAFE message with the CURRENT safety node (not external neighbor) */
-            char safe_msg[MAX_BUFFER];
-            snprintf(safe_msg, MAX_BUFFER, "SAFE %s %s\n",
-                    node.safe_node_ip, node.safe_node_port);
-            
-            printf("SAFETY: Sending updated SAFE message to %s:%s (fd: %d, interface: %d): %s", 
-                   n->ip, n->port, n->fd, n->interface_id, safe_msg);
-            
-            /* Send the message and handle errors */
-            if (write(n->fd, safe_msg, strlen(safe_msg)) < 0) {
-                perror("write");
-                printf("SAFETY: Failed to send SAFE message to %s:%s (fd: %d, interface: %d)\n", 
-                      n->ip, n->port, n->fd, n->interface_id);
-                /* Continue with other neighbors even if one fails */
-            } else {
-                printf("SAFETY: Successfully sent SAFE message to %s:%s (fd: %d, interface: %d)\n", 
-                      n->ip, n->port, n->fd, n->interface_id);
-                sent_count++;
-            }
+        /* REMOVED interface ID check to ensure ALL internal neighbors get the update */
+        /* Create SAFE message with EXTERNAL NEIGHBOR as safety node for our internal neighbors */
+        char safe_msg[MAX_BUFFER];
+        snprintf(safe_msg, MAX_BUFFER, "SAFE %s %s\n",
+                node.ext_neighbor_ip, node.ext_neighbor_port);
+        
+        printf("SAFETY: Sending updated SAFE message to %s:%s (fd: %d, interface: %d): %s", 
+               n->ip, n->port, n->fd, n->interface_id, safe_msg);
+        
+        /* Send message and handle errors */
+        if (write(n->fd, safe_msg, strlen(safe_msg)) < 0) {
+            perror("write");
+            printf("SAFETY: Failed to send SAFE message to %s:%s (fd: %d, interface: %d)\n", 
+                  n->ip, n->port, n->fd, n->interface_id);
+            /* Continue with other neighbors even if one fails */
         } else {
-            printf("SAFETY: Skipping neighbor %s:%s with invalid interface ID: %d\n", 
-                   n->ip, n->port, n->interface_id);
+            printf("SAFETY: Successfully sent SAFE message to %s:%s (fd: %d, interface: %d)\n", 
+                  n->ip, n->port, n->fd, n->interface_id);
+            sent_count++;
         }
         
         n = n->next;
@@ -189,49 +183,40 @@ void update_and_propagate_safety_node() {
 }
 
 /**
- * Processes a SAFE message received from a neighbor
- * @param fd File descriptor of the connection
- * @param ip IP address of the safety node
- * @param port Port of the safety node
- * @return 0 on success, -1 on error
+ * Processa uma mensagem SAFE recebida de um vizinho.
+ * 
+ * @param fd Descritor de ficheiro da ligação
+ * @param ip Endereço IP do nó de salvaguarda
+ * @param port Porto do nó de salvaguarda
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int handle_safe_message(int fd, char *ip, char *port) {
-    printf("SAFETY: Received SAFE message for safety node %s:%s from fd %d\n", ip, port, fd);
-    
     /* Find the neighbor that sent this message */
-    Neighbor *curr = node.neighbors;
-    int found = 0;
-
-    while (curr != NULL) {
+    Neighbor *sender = NULL;
+    for (Neighbor *curr = node.neighbors; curr != NULL; curr = curr->next) {
         if (curr->fd == fd) {
-            found = 1;
+            sender = curr;
             break;
         }
-        curr = curr->next;
     }
 
-    if (!found) {
-        printf("SAFETY: Warning: Received SAFE message from unknown neighbor (fd: %d)\n", fd);
-    } else {
-        printf("SAFETY: Received SAFE message from %s:%s (interface %d)\n",
-               curr->ip, curr->port, curr->interface_id);
-    }
-
-    /* Validate safety node information */
-    if (ip == NULL || port == NULL || strlen(ip) == 0 || strlen(port) == 0) {
-        printf("SAFETY: Invalid safety node information: IP or port is empty\n");
-        return -1;
-    }
-
-    /* Update safety node information */
-    printf("SAFETY: Updating safety node from %s:%s to %s:%s\n", 
-           node.safe_node_ip, node.safe_node_port, ip, port);
+    printf("SAFETY: Received SAFE message from %s:%s\n", 
+           sender ? sender->ip : ip, sender ? sender->port : port);
     
-    strcpy(node.safe_node_ip, ip);
-    strcpy(node.safe_node_port, port);
+    /* SIMPLIFIED APPROACH: Use the sender's information as the safety node */
+    if (sender != NULL) {
+        printf("SAFETY: Setting safety node to sender: %s:%s\n", sender->ip, sender->port);
+        strcpy(node.safe_node_ip, sender->ip);
+        strcpy(node.safe_node_port, sender->port);
+    } else {
+        /* Fallback to the original approach if sender not found */
+        printf("SAFETY: Falling back to message content for safety node: %s:%s\n", ip, port);
+        strcpy(node.safe_node_ip, ip);
+        strcpy(node.safe_node_port, port);
+    }
 
-    /* Debug output: show current topology */
-    printf("SAFETY: Current topology:\n");
+    /* Output current topology for debugging */
+    printf("SAFETY: Updated topology:\n");
     printf("SAFETY:   External neighbor: %s:%s\n", node.ext_neighbor_ip, node.ext_neighbor_port);
     printf("SAFETY:   Safety node: %s:%s\n", node.safe_node_ip, node.safe_node_port);
     
@@ -239,8 +224,8 @@ int handle_safe_message(int fd, char *ip, char *port) {
 }
 
 /**
- * Trata eventos de rede
- * Processa novas ligações e dados recebidos nos sockets de vizinhos
+ * Trata eventos de rede.
+ * Processa novas ligações e dados recebidos nos sockets de vizinhos.
  */
 void handle_network_events()
 {
@@ -261,16 +246,16 @@ void handle_network_events()
             char client_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
             
-            /* Note: We don't use the connection port for identification anymore,
-               but we still need it for logging purposes */
+            /* Nota: Não usamos mais o porto da ligação para identificação,
+               mas ainda precisamos dele para fins de registo */
             char client_port[6];
             snprintf(client_port, 6, "%d", ntohs(client_addr.sin_port));
 
             printf("New connection from %s:%s\n", client_ip, client_port);
 
-            /* Temporarily store this connection with its source port 
-               until we receive an ENTRY message with the real listening port */
-            /* We use 0 for is_external as we don't know yet */
+            /* Armazena temporariamente esta ligação com o seu porto de origem 
+               até recebermos uma mensagem ENTRY com o porto de escuta real */
+            /* Usamos 0 para is_external pois ainda não sabemos */
             add_neighbor(client_ip, client_port, new_fd, 0);
 
             /* Atualiza max_fd se necessário */
@@ -281,7 +266,7 @@ void handle_network_events()
         }
     }
 
-    /* Check for messages from existing connections */
+    /* Verifica mensagens de ligações existentes */
     Neighbor *curr = node.neighbors;
     while (curr != NULL)
     {
@@ -357,7 +342,7 @@ void handle_network_events()
                         {
                             printf("Received ENTRY message from %s:%s\n", sender_ip, sender_port);
 
-                            /* Update the neighbor information with the correct listening port */
+                            /* Atualiza as informações do vizinho com o porto de escuta correto */
                             update_neighbor_info(curr->fd, sender_ip, sender_port);
 
                             /* De acordo com o protocolo, responde com a informação do vizinho externo */
@@ -409,15 +394,7 @@ void handle_network_events()
 }
 
 /**
- * Envia uma mensagem de registo ao servidor de registo
- *
- * @param net ID da rede (três dígitos)
- * @param ip Endereço IP do nó
- * @param port Porto TCP do nó
- * @return 0 em caso de sucesso, -1 em caso de erro
- */
-/**
- * Envia uma mensagem de registo ao servidor de registo
+ * Envia uma mensagem de registo ao servidor de registo.
  *
  * @param net ID da rede (três dígitos)
  * @param ip Endereço IP do nó
@@ -431,7 +408,7 @@ int send_reg_message(char *net, char *ip, char *port)
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(node.reg_server_port));
     
-    // Ensure IP address conversion is successful
+    // Garante que a conversão do endereço IP seja bem-sucedida
     if (inet_pton(AF_INET, node.reg_server_ip, &server_addr.sin_addr) != 1) {
         printf("Invalid registration server IP address: %s\n", node.reg_server_ip);
         return -1;
@@ -442,13 +419,13 @@ int send_reg_message(char *net, char *ip, char *port)
 
     printf("Sending registration to %s:%s: %s\n", node.reg_server_ip, node.reg_server_port, message);
 
-    // Set a timeout for the receive operation
+    // Define um timeout para a operação de receção
     struct timeval timeout;
-    timeout.tv_sec = 5;  // 5 seconds timeout
+    timeout.tv_sec = 5;  // 5 segundos timeout
     timeout.tv_usec = 0;
     if (setsockopt(node.reg_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt receive timeout");
-        // Continue anyway, just without timeout
+        // Continua de qualquer forma, apenas sem timeout
     }
 
     if (sendto(node.reg_fd, message, strlen(message), 0,
@@ -489,16 +466,9 @@ int send_reg_message(char *net, char *ip, char *port)
 
     return 0;
 }
+
 /**
- * Envia uma mensagem de remoção de registo ao servidor de registo
- *
- * @param net ID da rede (três dígitos)
- * @param ip Endereço IP do nó
- * @param port Porto TCP do nó
- * @return 0 em caso de sucesso, -1 em caso de erro
- */
-/**
- * Envia uma mensagem de remoção de registo ao servidor de registo
+ * Envia uma mensagem de remoção de registo ao servidor de registo.
  *
  * @param net ID da rede (três dígitos)
  * @param ip Endereço IP do nó
@@ -512,7 +482,7 @@ int send_unreg_message(char *net, char *ip, char *port)
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(node.reg_server_port));
     
-    // Ensure IP address conversion is successful
+    // Garante que a conversão do endereço IP seja bem-sucedida
     if (inet_pton(AF_INET, node.reg_server_ip, &server_addr.sin_addr) != 1) {
         printf("Invalid registration server IP address: %s\n", node.reg_server_ip);
         return -1;
@@ -523,13 +493,13 @@ int send_unreg_message(char *net, char *ip, char *port)
 
     printf("Sending unregistration to %s:%s: %s\n", node.reg_server_ip, node.reg_server_port, message);
 
-    // Set a timeout for the receive operation
+    // Define um timeout para a operação de receção
     struct timeval timeout;
-    timeout.tv_sec = 5;  // 5 seconds timeout
+    timeout.tv_sec = 5;  // 5 segundos timeout
     timeout.tv_usec = 0;
     if (setsockopt(node.reg_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt receive timeout");
-        // Continue anyway, just without timeout
+        // Continua de qualquer forma, apenas sem timeout
     }
 
     if (sendto(node.reg_fd, message, strlen(message), 0,
@@ -572,22 +542,15 @@ int send_unreg_message(char *net, char *ip, char *port)
 }
 
 /**
- * Envia um pedido de nós ao servidor de registo
- * Modificado para garantir a formatação correta do ID de rede
- *
- * @param net ID da rede (três dígitos)
- * @return 0 em caso de sucesso, -1 em caso de erro
- */
-/**
- * Envia um pedido de nós ao servidor de registo
- * Modificado para garantir a formatação correta do ID de rede
+ * Envia um pedido de nós ao servidor de registo.
+ * Modificado para garantir a formatação correta do ID de rede.
  *
  * @param net ID da rede (três dígitos)
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int send_nodes_request(char *net)
 {
-    // Validate network ID format
+    // Valida o formato do ID de rede
     if (strlen(net) != 3 || !isdigit(net[0]) || !isdigit(net[1]) || !isdigit(net[2])) {
         printf("Invalid network ID format: %s. Must be exactly 3 digits.\n", net);
         return -1;
@@ -598,7 +561,7 @@ int send_nodes_request(char *net)
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(node.reg_server_port));
     
-    // Ensure IP address conversion is successful
+    // Garante que a conversão do endereço IP seja bem-sucedida
     if (inet_pton(AF_INET, node.reg_server_ip, &server_addr.sin_addr) != 1) {
         printf("Invalid registration server IP address: %s\n", node.reg_server_ip);
         return -1;
@@ -611,13 +574,13 @@ int send_nodes_request(char *net)
     printf("Sending request: %s to registration server %s:%s\n", 
            message, node.reg_server_ip, node.reg_server_port);
 
-    // Set a timeout for the operation
+    // Define um timeout para a operação
     struct timeval timeout;
-    timeout.tv_sec = 5;  // 5 seconds timeout
+    timeout.tv_sec = 5;  // 5 segundos timeout
     timeout.tv_usec = 0;
     if (setsockopt(node.reg_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt receive timeout");
-        // Continue anyway, just without timeout
+        // Continua de qualquer forma, apenas sem timeout
     }
 
     if (sendto(node.reg_fd, message, strlen(message), 0,
@@ -631,15 +594,8 @@ int send_nodes_request(char *net)
 }
 
 /**
- * Processa uma resposta NODESLIST do servidor de registo
- * Melhorado para lidar corretamente com respostas de rede mistas e verificar a adesão à rede
- *
- * @param buffer Buffer contendo a resposta NODESLIST
- * @return 0 em caso de sucesso, -1 em caso de erro
- */
-/**
- * Processa uma resposta NODESLIST do servidor de registo
- * Melhorado para lidar corretamente com respostas de rede mistas e verificar a adesão à rede
+ * Processa uma resposta NODESLIST do servidor de registo.
+ * Melhorado para lidar corretamente com respostas de rede mistas e verificar a adesão à rede.
  *
  * @param buffer Buffer contendo a resposta NODESLIST
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -661,7 +617,7 @@ int process_nodeslist_response(char *buffer)
         return -1;
     }
 
-    // Validate network ID format
+    // Valida o formato do ID de rede
     if (strlen(requested_net) != 3 || !isdigit(requested_net[0]) || 
         !isdigit(requested_net[1]) || !isdigit(requested_net[2])) {
         printf("Invalid network ID in response: %s\n", requested_net);
@@ -700,9 +656,9 @@ int process_nodeslist_response(char *buffer)
         }
         else
         {
-            // Handle malformed node entry
+            // Trata entrada de nó mal formatada
             printf("Malformed node entry in NODESLIST: %s\n", line);
-            // Continue processing instead of failing
+            // Continua o processamento em vez de falhar
         }
     }
 
@@ -735,7 +691,7 @@ int process_nodeslist_response(char *buffer)
     }
 
     /* Tenta ligar-se a um nó aleatório da lista */
-    // Use current time as seed for random number generator
+    // Usa o tempo atual como semente para o gerador de números aleatórios
     srand(time(NULL));
     int random_index = rand() % node_count;
     char *chosen_ip = node_ips[random_index];
@@ -751,14 +707,14 @@ int process_nodeslist_response(char *buffer)
         return -1;
     }
 
-    /* Define o vizinho externo - use the specified listening port, not the connection port */
+    /* Define o vizinho externo - usa o porto de escuta especificado, não o porto da ligação */
     strcpy(node.ext_neighbor_ip, chosen_ip);
     strcpy(node.ext_neighbor_port, chosen_port);
 
-    /* Adiciona o nó como vizinho externo - use the specified listening port */
+    /* Adiciona o nó como vizinho externo - usa o porto de escuta especificado */
     add_neighbor(chosen_ip, chosen_port, fd, 1);
 
-    /* Envia mensagem ENTRY with our listening port, not the connection port */
+    /* Envia mensagem ENTRY com o nosso porto de escuta, não o porto da ligação */
     if (send_entry_message(fd, node.ip, node.port) < 0)
     {
         printf("Failed to send ENTRY message.\n");
@@ -787,7 +743,7 @@ int process_nodeslist_response(char *buffer)
 }
 
 /**
- * Envia uma mensagem ENTRY para um nó
+ * Envia uma mensagem ENTRY para um nó.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó emissor
@@ -809,7 +765,7 @@ int send_entry_message(int fd, char *ip, char *port)
 }
 
 /**
- * Envia uma mensagem SAFE para um nó
+ * Envia uma mensagem SAFE para um nó.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó de salvaguarda
@@ -831,7 +787,7 @@ int send_safe_message(int fd, char *ip, char *port)
 }
 
 /**
- * Processa uma mensagem ENTRY recebida
+ * Processa uma mensagem ENTRY recebida.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó emissor
@@ -856,7 +812,7 @@ int handle_entry_message(int fd, char *ip, char *port)
 }
 
 /**
- * Envia uma mensagem de interesse para um objeto
+ * Envia uma mensagem de interesse para um objeto.
  *
  * @param name Nome do objeto pretendido
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -922,7 +878,7 @@ int send_interest_message(char *name)
 }
 
 /**
- * Envia uma mensagem de objeto para um nó
+ * Envia uma mensagem de objeto para um nó.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto a enviar
@@ -966,12 +922,11 @@ int send_object_message(int fd, char *name)
     }
 
     printf("Successfully sent object %s to fd %d\n", name, fd);
-    // debug_interest_table();
     return 0;
 }
 
 /**
- * Envia uma mensagem NOOBJECT para um nó
+ * Envia uma mensagem NOOBJECT para um nó.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto não encontrado
@@ -992,8 +947,8 @@ int send_noobject_message(int fd, char *name)
 }
 
 /**
- * Processa uma mensagem de interesse recebida
- * Versão corrigida com melhor tratamento de erros
+ * Processa uma mensagem de interesse recebida.
+ * Versão corrigida com melhor tratamento de erros.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto pretendido
@@ -1099,7 +1054,7 @@ int handle_interest_message(int fd, char *name)
 }
 
 /**
- * Processa uma mensagem de objeto recebida
+ * Processa uma mensagem de objeto recebida.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto recebido
@@ -1184,8 +1139,8 @@ int handle_object_message(int fd, char *name)
 }
 
 /**
- * Processa uma mensagem NOOBJECT recebida
- * Versão modificada com melhor rastreamento de estado
+ * Processa uma mensagem NOOBJECT recebida.
+ * Versão modificada com melhor rastreamento de estado.
  *
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto não encontrado
@@ -1299,14 +1254,7 @@ int handle_noobject_message(int fd, char *name)
 }
 
 /**
- * Liga-se a um nó com tratamento de erros melhorado e timeout
- *
- * @param ip Endereço IP do nó a ligar
- * @param port Porto TCP do nó a ligar
- * @return Descritor de ficheiro da ligação em caso de sucesso, -1 em caso de erro
- */
-/**
- * Liga-se a um nó com tratamento de erros melhorado e timeout
+ * Liga-se a um nó com tratamento de erros melhorado e timeout.
  *
  * @param ip Endereço IP do nó a ligar
  * @param port Porto TCP do nó a ligar
@@ -1335,13 +1283,13 @@ int connect_to_node(char *ip, char *port)
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
     {
         perror("setsockopt receive timeout");
-        // Continue anyway
+        // Continua de qualquer forma
     }
 
     if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0)
     {
         perror("setsockopt send timeout");
-        // Continue anyway
+        // Continua de qualquer forma
     }
 
     /* Torna o socket não-bloqueante para connect */
@@ -1453,16 +1401,7 @@ int connect_to_node(char *ip, char *port)
 }
 
 /**
- * Adiciona um vizinho
- *
- * @param ip Endereço IP do vizinho
- * @param port Porto TCP do vizinho
- * @param fd Descritor de ficheiro da ligação
- * @param is_external 1 se for vizinho externo, 0 se for interno
- * @return 0 em caso de sucesso, -1 em caso de erro
- */
-/**
- * Adiciona um vizinho
+ * Adiciona um vizinho.
  *
  * @param ip Endereço IP do vizinho
  * @param port Porto TCP do vizinho
@@ -1532,38 +1471,14 @@ int add_neighbor(char *ip, char *port, int fd, int is_external)
 }
 
 /**
- * Remove um vizinho
- *
- * @param fd Descritor de ficheiro da ligação
- * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
- */
-/**
- * Remove a neighbor from the list of neighbors
- *
- * @param fd Descritor de ficheiro da ligação
- * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
- */
-/**
- * Remove a neighbor from the list of neighbors
- *
- * @param fd Descritor de ficheiro da ligação
- * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
- */
-/**
- * Remove a neighbor from the list of neighbors
- *
- * @param fd Descritor de ficheiro da ligação
- * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
- */
-/**
- * Remove a neighbor from the list of neighbors
+ * Remove um vizinho da lista de vizinhos.
  *
  * @param fd Descritor de ficheiro da ligação
  * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
  */
 int remove_neighbor(int fd)
 {
-    /* Procura o vizinho */
+    /* Find the neighbor */
     Neighbor *prev = NULL;
     Neighbor *curr = node.neighbors;
     int is_external = 0;
@@ -1574,18 +1489,18 @@ int remove_neighbor(int fd)
     {
         if (curr->fd == fd)
         {
-            /* Guarda informação do vizinho antes de o remover */
+            /* Save information about the neighbor before removing it */
             strcpy(removed_ip, curr->ip);
             strcpy(removed_port, curr->port);
 
-            /* Verifica se é o vizinho externo */
+            /* Check if it's the external neighbor */
             if (strcmp(curr->ip, node.ext_neighbor_ip) == 0 &&
                 strcmp(curr->port, node.ext_neighbor_port) == 0)
             {
                 is_external = 1;
             }
 
-            /* Remove da lista de vizinhos */
+            /* Remove from the neighbors list */
             if (prev == NULL)
             {
                 node.neighbors = curr->next;
@@ -1595,7 +1510,7 @@ int remove_neighbor(int fd)
                 prev->next = curr->next;
             }
 
-            /* Remove também da lista de vizinhos internos se estiver lá */
+            /* Also remove from the internal neighbors list if it's there */
             Neighbor *prev_internal = NULL;
             Neighbor *curr_internal = node.internal_neighbors;
 
@@ -1620,11 +1535,11 @@ int remove_neighbor(int fd)
                 curr_internal = curr_internal->next;
             }
 
-            /* Fecha o socket e liberta a memória */
+            /* Close the socket and free the memory */
             close(curr->fd);
             free(curr);
 
-            /* Trata a saída do nó com base no protocolo */
+            /* Handle the departure of the node based on the protocol */
             if (is_external)
             {
                 printf("External neighbor %s:%s disconnected\n", removed_ip, removed_port);
@@ -1637,21 +1552,21 @@ int remove_neighbor(int fd)
                     printf("WARNING: Safety node has disconnected.\n");
                 }
 
-                /* O protocolo diz:
-                   1. Se o nó não é a sua própria salvaguarda, liga-se ao nó de salvaguarda
-                   2. Se o nó é a sua própria salvaguarda e tem vizinhos internos,
-                      escolhe um como novo vizinho externo
-                   3. Se o nó é a sua própria salvaguarda e não tem vizinhos internos,
-                      torna-se autónomo
+                /* The protocol says:
+                   1. If the node is not its own salvage, connect to the salvage node
+                   2. If the node is its own salvage and has internal neighbors,
+                      choose one as new external neighbor
+                   3. If the node is its own salvage and has no internal neighbors,
+                      become autonomous
                 */
 
-                /* Node is its own safety if its IP and port match the safety node's */
+                /* Check if node is its own salvage */
                 int self_is_safety = (strcmp(node.safe_node_ip, node.ip) == 0 && 
-                                      strcmp(node.safe_node_port, node.port) == 0);
+                                     strcmp(node.safe_node_port, node.port) == 0);
 
                 if (!self_is_safety && !safety_node_disconnected)
                 {
-                    /* Não é auto-salvaguardado - liga-se ao nó de salvaguarda */
+                    /* Not self-salvaged - connect to the salvage node */
                     printf("Connecting to safety node %s:%s\n",
                            node.safe_node_ip, node.safe_node_port);
 
@@ -1663,14 +1578,14 @@ int remove_neighbor(int fd)
                         return -1;
                     }
 
-                    /* Atualiza o vizinho externo */
+                    /* Update the external neighbor */
                     strcpy(node.ext_neighbor_ip, node.safe_node_ip);
                     strcpy(node.ext_neighbor_port, node.safe_node_port);
 
-                    /* Adiciona como vizinho */
+                    /* Add as neighbor */
                     add_neighbor(node.safe_node_ip, node.safe_node_port, new_fd, 1);
 
-                    /* Envia mensagem ENTRY */
+                    /* Send ENTRY message */
                     char message[MAX_BUFFER];
                     snprintf(message, MAX_BUFFER, "ENTRY %s %s\n", node.ip, node.port);
 
@@ -1680,33 +1595,31 @@ int remove_neighbor(int fd)
                         return -1;
                     }
 
-                    /* Now call the fixed update_and_propagate_safety_node function */
+                    /* Call the updated function to propagate new safety node info */
                     update_and_propagate_safety_node();
                 }
                 else if (node.internal_neighbors != NULL)
                 {
-                    /* Auto-salvaguardado ou safety node disconnected, e tem vizinhos internos */
-                    printf("Self is safety node or safety node disconnected, and has internal neighbors\n");
+                    /* Self-safety or safety node disconnected, and has internal neighbors */
+                    printf("External neighbor is disconnected, and node has internal neighbors\n");
                     printf("Choosing new external neighbor from internal neighbors\n");
 
-                    /* Escolhe o primeiro vizinho interno como novo vizinho externo */
+                    /* Choose first internal neighbor as new external neighbor */
                     Neighbor *chosen = node.internal_neighbors;
 
-                    /* Define como novo vizinho externo */
+                    /* Set as new external neighbor */
                     strcpy(node.ext_neighbor_ip, chosen->ip);
                     strcpy(node.ext_neighbor_port, chosen->port);
                     
-                    /* Update safety node to self if it was the disconnected node */
-                    if (safety_node_disconnected) {
-                        strcpy(node.safe_node_ip, node.ip);
-                        strcpy(node.safe_node_port, node.port);
-                        printf("Updated safety node to self: %s:%s\n", node.ip, node.port);
-                    }
+                    /* Always update safety node to self when reconfiguring */
+                    strcpy(node.safe_node_ip, node.ip);
+                    strcpy(node.safe_node_port, node.port);
+                    printf("Updated safety node to self: %s:%s\n", node.ip, node.port);
 
                     printf("Selected %s:%s as new external neighbor\n",
                            chosen->ip, chosen->port);
 
-                    /* Envia mensagem ENTRY */
+                    /* Send ENTRY message */
                     char message[MAX_BUFFER];
                     snprintf(message, MAX_BUFFER, "ENTRY %s %s\n", node.ip, node.port);
 
@@ -1716,15 +1629,15 @@ int remove_neighbor(int fd)
                         return -1;
                     }
 
-                    /* Now call the fixed update_and_propagate_safety_node function */
+                    /* Call the updated function to propagate new safety node info */
                     update_and_propagate_safety_node();
                 }
                 else
                 {
-                    /* Auto-salvaguardado sem vizinhos internos */
+                    /* Self-safety with no internal neighbors */
                     printf("Self is safety node with no internal neighbors, becoming standalone\n");
 
-                    /* Torna-se nó autónomo */
+                    /* Become autonomous node */
                     strcpy(node.ext_neighbor_ip, node.ip);
                     strcpy(node.ext_neighbor_port, node.port);
                     strcpy(node.safe_node_ip, node.ip);
@@ -1739,12 +1652,12 @@ int remove_neighbor(int fd)
         curr = curr->next;
     }
 
-    return -1; /* Vizinho não encontrado */
+    return -1; /* Neighbor not found */
 }
 
 /**
- * Verifica entradas de interesse que expiraram o tempo limite
- * Versão melhorada com gestão adequada do ciclo de vida dos interesses
+ * Verifica entradas de interesse que expiraram o tempo limite.
+ * Versão melhorada com gestão adequada do ciclo de vida dos interesses.
  */
 void check_interest_timeouts()
 {
@@ -1804,12 +1717,8 @@ void check_interest_timeouts()
 }
 
 /**
- * Trata respostas do servidor de registo
- * Modificado para garantir a correspondência de resposta de rede correta
- */
-/**
- * Trata respostas do servidor de registo
- * Modificado para garantir a correspondência de resposta de rede correta
+ * Trata respostas do servidor de registo.
+ * Modificado para garantir a correspondência de resposta de rede correta.
  */
 void handle_registration_response()
 {
@@ -1826,7 +1735,7 @@ void handle_registration_response()
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 perror("recvfrom");
             }
-            // No message if it's just a timeout
+            // Sem mensagem se for apenas um timeout
         }
         return;
     }
@@ -1843,7 +1752,7 @@ void handle_registration_response()
         {
             printf("Processing NODESLIST for network %s\n", response_net);
             
-            // Only process if we're not already in a network
+            // Processa apenas se ainda não estiver numa rede
             if (!node.in_network) {
                 process_nodeslist_response(buffer);
             } else {
