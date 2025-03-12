@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 {
     if (argc < 4)
     {
-        fprintf(stderr, "Usage: %s cache IP TCP [regIP regUDP]\n", argv[0]);
+        fprintf(stderr, "Utilização: %s cache IP TCP [regIP regUDP]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -133,7 +133,7 @@ void handle_sigint(int sig)
     /* Suprime aviso de parâmetro não utilizado */
     (void)sig;
 
-    printf("\nReceived SIGINT, cleaning up and exiting...\n");
+    printf("\nSinal SIGINT recebido, a limpar recursos e a terminar...\n");
     cleanup_and_exit();
     exit(EXIT_SUCCESS);
 }
@@ -170,7 +170,7 @@ void handle_user_input()
         /* Mostra erro apenas se o comando não estava vazio */
         if (strlen(cmd_buffer) > 0)
         {
-            printf("Error processing command: %s\n", cmd_buffer);
+            printf("Erro ao processar comando: %s\n", cmd_buffer);
         }
     }
 }
@@ -276,9 +276,28 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
     }
 
     freeaddrinfo(res);
-    printf("Node initialized with IP %s and port %s\n", ip, port);
-    printf("Registration server set to %s:%d\n", reg_ip, reg_udp);
-    printf("Enter 'help' for a list of commands\n");
+    
+    /* Interface de utilizador melhorada */
+    printf("\n");
+    printf("╔══════════════════════════════════════════════════════════════╗\n");
+    printf("║        Rede de Dados Identificados por Nome (NDN)            ║\n");
+    printf("║                  Versão 1.0 - 2024/2025                      ║\n");
+    printf("╠══════════════════════════════════════════════════════════════╣\n");
+    printf("║ Nó inicializado com:                                         ║\n");
+    printf("║ • Endereço IP: %-45s ║\n", ip);
+    printf("║ • Porto TCP: %-46s ║\n", port);
+    printf("║ • Tamanho da cache: %-42d ║\n", cache_size);
+    printf("║ • Servidor de registo: %s:%-37d ║\n", reg_ip, reg_udp);
+    printf("╠══════════════════════════════════════════════════════════════╣\n");
+    printf("║ Comandos Principais:                                         ║\n");
+    printf("║ • j <rede>        - Entrar numa rede                         ║\n");
+    printf("║ • dj <IP> <TCP>   - Entrar diretamente numa rede             ║\n");
+    printf("║ • c <nome>        - Criar objeto                             ║\n");
+    printf("║ • r <nome>        - Obter objeto                             ║\n");
+    printf("║ • st              - Mostrar topologia                         ║\n");
+    printf("║ • help            - Mostrar todos os comandos                ║\n");
+    printf("╚══════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
 }
 
 /**

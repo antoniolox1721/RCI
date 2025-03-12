@@ -24,14 +24,13 @@
 int cmd_join(char *net);
 
 /**
- * Processa o comando "direct join" (dj) para aderir diretamente a uma rede.
- * Liga-se diretamente ao nó especificado sem consultar o servidor de registo.
+ * Directly join a network or create a new one without registering with the server.
  * 
- * @param connect_ip Endereço IP do nó a ligar
- * @param connect_tcp Porto TCP do nó a ligar
- * @return 0 em caso de sucesso, -1 em caso de erro
+ * @param connect_ip IP address of the node to connect to, or 0.0.0.0 to create a new network
+ * @param connect_port TCP port of the node to connect to
+ * @return 0 on success, -1 on error
  */
-int cmd_direct_join(char *connect_ip, char *connect_tcp);
+int cmd_direct_join(char *connect_ip, char *connect_port);
 
 /**
  * Processa o comando "create" (c) para criar um objeto.

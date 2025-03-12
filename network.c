@@ -227,6 +227,10 @@ int handle_safe_message(int fd, char *ip, char *port) {
  * Trata eventos de rede.
  * Processa novas ligações e dados recebidos nos sockets de vizinhos.
  */
+/**
+ * Trata eventos de rede.
+ * Processa novas ligações e dados recebidos nos sockets de vizinhos.
+ */
 void handle_network_events()
 {
     /* Verifica se há uma nova ligação no socket de escuta */
@@ -333,27 +337,105 @@ void handle_network_events()
                     }
                     else if (strcmp(msg_type, "ENTRY") == 0)
                     {
-                        /* Extrai o IP e porto da mensagem sem strtok no buffer original */
+                        /* Extract IP and port without using strtok on original buffer */
                         char sender_ip[INET_ADDRSTRLEN] = {0};
                         char sender_port[6] = {0};
 
-                        /* Analisa a mensagem original para evitar problemas com strtok */
                         if (sscanf(buffer, "ENTRY %s %s", sender_ip, sender_port) == 2)
                         {
                             printf("Received ENTRY message from %s:%s\n", sender_ip, sender_port);
 
-                            /* Atualiza as informações do vizinho com o porto de escuta correto */
-                            update_neighbor_info(curr->fd, sender_ip, sender_port);
-
-                            /* De acordo com o protocolo, responde com a informação do vizinho externo */
-                            char safe_msg[MAX_BUFFER];
-                            snprintf(safe_msg, MAX_BUFFER, "SAFE %s %s\n",
-                                     node.ext_neighbor_ip, node.ext_neighbor_port);
-
-                            printf("Sending SAFE message: %s", safe_msg);
-                            if (write(curr->fd, safe_msg, strlen(safe_msg)) < 0)
+                            /* Special case: Check if this is the network creator receiving its first ENTRY message */
+                            /* The network creator has empty ext_neighbor_ip */
+                            if (strlen(node.ext_neighbor_ip) == 0 || strcmp(node.ext_neighbor_ip, "") == 0)
                             {
-                                perror("write");
+                                printf("NETWORK CREATOR: First ENTRY received - setting up mutual relationship\n");
+                                
+                                /* Set this node as the external neighbor */
+                                strcpy(node.ext_neighbor_ip, sender_ip);
+                                strcpy(node.ext_neighbor_port, sender_port);
+                                
+                                /* Update neighbor info with correct port */
+                                update_neighbor_info(curr->fd, sender_ip, sender_port);
+                                
+                                /* Mark the neighbor as external too (not just internal) */
+                                Neighbor *n = node.neighbors;
+                                while (n != NULL) {
+                                    if (strcmp(n->ip, sender_ip) == 0 && strcmp(n->port, sender_port) == 0) {
+                                        /* This is an important fix - we need to add as external too */
+                                        printf("NETWORK CREATOR: Marking %s:%s as external neighbor\n", 
+                                               sender_ip, sender_port);
+                                        add_neighbor(sender_ip, sender_port, n->fd, 1); /* 1 = external */
+                                        break;
+                                    }
+                                    n = n->next;
+                                }
+                                
+                                /* Send ENTRY message back to establish mutual connection */
+                                char entry_msg[MAX_BUFFER];
+                                snprintf(entry_msg, MAX_BUFFER, "ENTRY %s %s\n", 
+                                         node.ip, node.port);
+                                
+                                printf("NETWORK CREATOR: Sending ENTRY back: %s", entry_msg);
+                                if (write(curr->fd, entry_msg, strlen(entry_msg)) < 0) {
+                                    perror("write");
+                                }
+                                
+                                /* Send SAFE message with our IP as safety node */
+                                char safe_msg[MAX_BUFFER];
+                                snprintf(safe_msg, MAX_BUFFER, "SAFE %s %s\n",
+                                         node.ip, node.port);
+                                
+                                printf("NETWORK CREATOR: Sending SAFE message: %s", safe_msg);
+                                if (write(curr->fd, safe_msg, strlen(safe_msg)) < 0) {
+                                    perror("write");
+                                }
+                            }
+                            /* Special case: Second node receiving ENTRY from first node */
+                            else if (node.neighbors != NULL && node.neighbors->next == NULL && 
+                                     strcmp(node.neighbors->ip, sender_ip) == 0 &&
+                                     strcmp(sender_ip, node.ext_neighbor_ip) == 0)
+                            {
+                                printf("SECOND NODE: Receiving ENTRY from network creator\n");
+                                
+                                /* Already added as external, now add as internal too */
+                                Neighbor *internal_copy = malloc(sizeof(Neighbor));
+                                if (internal_copy != NULL) {
+                                    strcpy(internal_copy->ip, sender_ip);
+                                    strcpy(internal_copy->port, sender_port);
+                                    internal_copy->fd = curr->fd;
+                                    internal_copy->interface_id = curr->interface_id;
+                                    internal_copy->next = node.internal_neighbors;
+                                    node.internal_neighbors = internal_copy;
+                                    
+                                    printf("SECOND NODE: Added network creator %s:%s as internal neighbor\n", 
+                                           sender_ip, sender_port);
+                                }
+                                
+                                /* Set network creator as external neighbor */
+                                strcpy(node.ext_neighbor_ip, sender_ip);
+                                strcpy(node.ext_neighbor_port, sender_port);
+                                
+                                /* FIXED: Set itself as its own safety node */
+                                strcpy(node.safe_node_ip, node.ip);
+                                strcpy(node.safe_node_port, node.port);
+                                printf("SECOND NODE: Set self as safety node: %s:%s\n", node.ip, node.port);
+                            }
+                            else
+                            {
+                                /* Regular case: Update neighbor with correct listening port */
+                                update_neighbor_info(curr->fd, sender_ip, sender_port);
+                                
+                                /* Send SAFE message with external neighbor info */
+                                char safe_msg[MAX_BUFFER];
+                                snprintf(safe_msg, MAX_BUFFER, "SAFE %s %s\n",
+                                         node.ext_neighbor_ip, node.ext_neighbor_port);
+                                
+                                printf("Sending SAFE message: %s", safe_msg);
+                                if (write(curr->fd, safe_msg, strlen(safe_msg)) < 0)
+                                {
+                                    perror("write");
+                                }
                             }
                         }
                         else
@@ -594,7 +676,7 @@ int send_nodes_request(char *net)
 }
 
 /**
- * Processa uma resposta NODESLIST do servidor de registo.
+ * Processa a resposta NODESLIST do servidor de registo.
  * Melhorado para lidar corretamente com respostas de rede mistas e verificar a adesão à rede.
  *
  * @param buffer Buffer contendo a resposta NODESLIST
@@ -667,7 +749,7 @@ int process_nodeslist_response(char *buffer)
     /* Se não houver nós, cria uma nova rede */
     if (node_count == 0)
     {
-        printf("No valid nodes found in network %s, creating new network\n", requested_net);
+        printf("No valid nodes found in network %s, creating new network as standalone node\n", requested_net);
 
         /* Regista-se na rede */
         if (send_reg_message(requested_net, node.ip, node.port) < 0)
@@ -680,13 +762,15 @@ int process_nodeslist_response(char *buffer)
         node.network_id = atoi(requested_net);
         node.in_network = 1;
 
-        /* Este nó é o seu próprio vizinho externo e nó de salvaguarda */
-        strcpy(node.ext_neighbor_ip, node.ip);
-        strcpy(node.ext_neighbor_port, node.port);
+        /* Initially, standalone node has no external neighbor */
+        strcpy(node.ext_neighbor_ip, "");
+        strcpy(node.ext_neighbor_port, "");
+        
+        /* Node is its own safety node */
         strcpy(node.safe_node_ip, node.ip);
         strcpy(node.safe_node_port, node.port);
-
-        printf("Created and joined network %s\n", requested_net);
+        
+        printf("Created and joined network %s as standalone node - waiting for connections\n", requested_net);
         return 0;
     }
 
@@ -794,16 +878,59 @@ int send_safe_message(int fd, char *ip, char *port)
  * @param port Porto TCP do nó emissor
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
+/**
+ * Processes a message ENTRY received.
+ *
+ * @param fd Descritor de ficheiro da ligação
+ * @param ip Endereço IP do nó emissor
+ * @param port Porto TCP do nó emissor
+ * @return 0 em caso de sucesso, -1 em caso de erro
+ */
 int handle_entry_message(int fd, char *ip, char *port)
 {
     printf("Received ENTRY message from %s:%s\n", ip, port);
 
-    /* Adiciona o nó como vizinho interno */
-    add_neighbor(ip, port, fd, 0); /* 0 = interno */
+    /* Special case: If this is the first node in the network (standalone) and gets its first connection */
+    int is_standalone_creator = (node.neighbors == NULL && node.internal_neighbors == NULL);
+    
+    if (is_standalone_creator) {
+        printf("First connection to standalone network creator - special handling\n");
+        
+        /* Set connecting node as external neighbor */
+        strcpy(node.ext_neighbor_ip, ip);
+        strcpy(node.ext_neighbor_port, port);
+        
+        /* Add connecting node as both internal and external neighbor */
+        add_neighbor(ip, port, fd, 1); /* 1 = external */
 
-    /* Envia mensagem SAFE com informação do vizinho externo */
-    if (send_safe_message(fd, node.ext_neighbor_ip, node.ext_neighbor_port) < 0)
-    {
+        /* Set this node and connecting node as mutual safety nodes */
+        strcpy(node.safe_node_ip, ip);
+        strcpy(node.safe_node_port, port);
+        
+        /* Send ENTRY message back to the connecting node */
+        char entry_msg[MAX_BUFFER];
+        snprintf(entry_msg, MAX_BUFFER, "ENTRY %s %s\n", node.ip, node.port);
+        if (write(fd, entry_msg, strlen(entry_msg)) < 0) {
+            perror("write");
+            return -1;
+        }
+        
+        /* Send SAFE message with our address as the safety node */
+        if (send_safe_message(fd, node.ip, node.port) < 0) {
+            printf("Failed to send SAFE message.\n");
+            return -1;
+        }
+        
+        printf("Special case: Mutual external/internal neighbor relationship established with %s:%s\n", 
+               ip, port);
+        return 0;
+    }
+    
+    /* Regular case - add as internal neighbor only */
+    add_neighbor(ip, port, fd, 0); /* 0 = internal */
+
+    /* Send message SAFE with information about external neighbor */
+    if (send_safe_message(fd, node.ext_neighbor_ip, node.ext_neighbor_port) < 0) {
         printf("Failed to send SAFE message.\n");
         return -1;
     }

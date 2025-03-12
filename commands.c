@@ -221,7 +221,7 @@ void print_help()
 /**
  * Aderir a uma rede através do servidor de registo.
  * Modificado para validar corretamente o ID da rede e processar a resposta.
- * 
+ *
  * @param net ID da rede (três dígitos)
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
@@ -240,7 +240,7 @@ int cmd_join(char *net)
         return -1;
     }
 
-    printf("Attempting to join network %s through registration server %s:%s\n", 
+    printf("Attempting to join network %s through registration server %s:%s\n",
            net, node.reg_server_ip, node.reg_server_port);
 
     /* Solicita a lista de nós na rede */
@@ -257,9 +257,10 @@ int cmd_join(char *net)
 
     // Define um timeout para a operação de receção
     struct timeval timeout;
-    timeout.tv_sec = 5;  // 5 segundos timeout
+    timeout.tv_sec = 5; // 5 segundos timeout
     timeout.tv_usec = 0;
-    if (setsockopt(node.reg_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+    if (setsockopt(node.reg_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
+    {
         perror("setsockopt receive timeout");
         // Continua de qualquer forma, apenas sem timeout
     }
@@ -269,13 +270,19 @@ int cmd_join(char *net)
 
     if (bytes_received <= 0)
     {
-        if (bytes_received < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (bytes_received < 0)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
                 printf("Timeout waiting for response from registration server\n");
-            } else {
+            }
+            else
+            {
                 perror("recvfrom");
             }
-        } else {
+        }
+        else
+        {
             printf("Empty response from registration server\n");
         }
         return -1;
@@ -303,63 +310,64 @@ int cmd_join(char *net)
 }
 
 /**
- * Aderir diretamente a uma rede sem usar o servidor de registo.
- * 
- * @param connect_ip Endereço IP do nó a ligar
- * @param connect_tcp Porto TCP do nó a ligar
- * @return 0 em caso de sucesso, -1 em caso de erro
+ * Directly join a network or create a new one without registering with the server.
+ *
+ * @param connect_ip IP address of the node to connect to, or 0.0.0.0 to create a new network
+ * @param connect_port TCP port of the node to connect to
+ * @return 0 on success, -1 on error
  */
-int cmd_direct_join(char *connect_ip, char *connect_tcp)
+int cmd_direct_join(char *connect_ip, char *connect_port)
 {
+    /* Check if already in a network */
     if (node.in_network)
     {
-        printf("Already in a network. Leave first.\n");
+        printf("Error: Already in network %03d. Leave first.\n", node.network_id);
         return -1;
     }
 
-    /* Usa um ID de rede predefinido */
-    char net[4] = "076"; // ID de rede predefinido
+    /* Use a default network ID (076) */
+    char net[4] = "076";
 
-    /* Se connect_ip for 0.0.0.0, cria uma nova rede */
+    /* Special case - creating a new network (0.0.0.0) */
     if (strcmp(connect_ip, "0.0.0.0") == 0)
     {
-        /* Regista-se na rede */
-        if (send_reg_message(net, node.ip, node.port) < 0)
-        {
-            printf("Failed to register with the network.\n");
-            return -1;
-        }
+        printf("Creating new network %s as standalone node\n", net);
 
-        /* Define o ID da rede e marca como in_network */
+        /* Set network ID */
         node.network_id = atoi(net);
         node.in_network = 1;
 
-        /* Este nó é o seu próprio vizinho externo e nó de salvaguarda */
-        strcpy(node.ext_neighbor_ip, node.ip);
-        strcpy(node.ext_neighbor_port, node.port);
+        /* Initially, standalone node has no external neighbor */
+        strcpy(node.ext_neighbor_ip, "");
+        strcpy(node.ext_neighbor_port, "");
+
+        /* Node is its own safety node */
         strcpy(node.safe_node_ip, node.ip);
         strcpy(node.safe_node_port, node.port);
 
-        printf("Created and joined network %s\n", net);
+        printf("Standalone node created for network %s - waiting for connections\n", net);
         return 0;
     }
 
-    /* Liga-se ao nó especificado */
-    int fd = connect_to_node(connect_ip, connect_tcp);
+    /* Regular connection to an existing node */
+    printf("Connecting to node %s:%s in network %s\n", connect_ip, connect_port, net);
+
+    /* Connect to the specified node */
+    int fd = connect_to_node(connect_ip, connect_port);
     if (fd < 0)
     {
-        printf("Failed to connect to %s:%s\n", connect_ip, connect_tcp);
+        printf("Failed to connect to %s:%s\n", connect_ip, connect_port);
         return -1;
     }
 
-    /* Define o vizinho externo */
+    /* Set as external neighbor */
     strcpy(node.ext_neighbor_ip, connect_ip);
-    strcpy(node.ext_neighbor_port, connect_tcp);
+    strcpy(node.ext_neighbor_port, connect_port);
 
-    /* Adiciona o nó como vizinho externo - usa o porto especificado no comando */
-    add_neighbor(connect_ip, connect_tcp, fd, 1);
+    /* Add as external neighbor */
+    add_neighbor(connect_ip, connect_port, fd, 1);
 
-    /* Envia mensagem ENTRY */
+    /* Send ENTRY message */
     if (send_entry_message(fd, node.ip, node.port) < 0)
     {
         printf("Failed to send ENTRY message.\n");
@@ -367,25 +375,17 @@ int cmd_direct_join(char *connect_ip, char *connect_tcp)
         return -1;
     }
 
-    /* Regista-se na rede */
-    if (send_reg_message(net, node.ip, node.port) < 0)
-    {
-        printf("Failed to register with the network.\n");
-        close(fd);
-        return -1;
-    }
-
-    /* Define o ID da rede e marca como in_network */
+    /* Set network ID */
     node.network_id = atoi(net);
     node.in_network = 1;
 
-    printf("Joined network %s through %s:%s\n", net, connect_ip, connect_tcp);
+    printf("Joined network %s through %s:%s\n", net, connect_ip, connect_port);
     return 0;
 }
 
 /**
  * Criar um objeto.
- * 
+ *
  * @param name Nome do objeto a criar
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
@@ -416,7 +416,7 @@ int cmd_create(char *name)
 
 /**
  * Eliminar um objeto.
- * 
+ *
  * @param name Nome do objeto a eliminar
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
@@ -441,7 +441,7 @@ int cmd_delete(char *name)
 /**
  * Obter um objeto.
  * Procura localmente e, se não encontrar, envia interesse pela rede.
- * 
+ *
  * @param name Nome do objeto a obter
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
@@ -529,7 +529,7 @@ int cmd_retrieve(char *name)
 
 /**
  * Mostrar a topologia da rede.
- * 
+ *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_show_topology()
@@ -574,7 +574,7 @@ int cmd_show_topology()
 
 /**
  * Mostrar nomes de objetos armazenados.
- * 
+ *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_show_names()
@@ -600,7 +600,7 @@ int cmd_show_names()
 
 /**
  * Mostrar a tabela de interesses.
- * 
+ *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_show_interest_table()
@@ -634,7 +634,7 @@ int cmd_show_interest_table()
 
 /**
  * Sair da rede.
- * 
+ *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_leave()
@@ -739,7 +739,7 @@ int cmd_leave()
 
 /**
  * Sair da aplicação.
- * 
+ *
  * @return 0 em caso de sucesso (nunca retorna na realidade, pois termina o programa)
  */
 int cmd_exit()
