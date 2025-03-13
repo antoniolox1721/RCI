@@ -308,7 +308,91 @@ int cmd_join(char *net)
 
     return 0;
 }
+// /**
+//  * Directly join a network or create a new one without registering with the server.
+//  *
+//  * @param connect_ip IP address of the node to connect to, or 0.0.0.0 to create a new network
+//  * @param connect_port TCP port of the node to connect to
+//  * @return 0 on success, -1 on error
+//  */
+// int cmd_direct_join(char *connect_ip, char *connect_port)
+// {
+//     /* Check if already in a network */
+//     if (node.in_network)
+//     {
+//         printf("Error: Already in network %03d. Leave first.\n", node.network_id);
+//         return -1;
+//     }
 
+//     /* Use a default network ID (076) */
+//     char net[4] = "076";
+
+//     /* Special case - creating a new network (0.0.0.0) */
+//     if (strcmp(connect_ip, "0.0.0.0") == 0)
+//     {
+//         printf("Creating new network %s as standalone node\n", net);
+
+//         /* Register with the registration server for this new network */
+//         if (send_reg_message(net, node.ip, node.port) < 0)
+//         {
+//             printf("Warning: Failed to register with the registration server.\n");
+//             printf("Other nodes won't be able to discover this network via the join command.\n");
+//             /* Continue anyway since this is direct join */
+//         }
+//         else
+//         {
+//             printf("Successfully registered with the registration server for network %s\n", net);
+//         }
+
+//         /* Set network ID */
+//         node.network_id = atoi(net);
+//         node.in_network = 1;
+
+//         /* Initially, standalone node has no external neighbor */
+//         strcpy(node.ext_neighbor_ip, "");
+//         strcpy(node.ext_neighbor_port, "");
+
+//         /* Node is its own safety node */
+//         strcpy(node.safe_node_ip, node.ip);
+//         strcpy(node.safe_node_port, node.port);
+
+//         printf("Standalone node created for network %s - waiting for connections\n", net);
+//         return 0;
+//     }
+
+//     /* Regular connection to an existing node */
+//     printf("Connecting to node %s:%s in network %s\n", connect_ip, connect_port, net);
+
+//     /* Connect to the specified node */
+//     int fd = connect_to_node(connect_ip, connect_port);
+//     if (fd < 0)
+//     {
+//         printf("Failed to connect to %s:%s\n", connect_ip, connect_port);
+//         return -1;
+//     }
+
+//     /* Set as external neighbor */
+//     strcpy(node.ext_neighbor_ip, connect_ip);
+//     strcpy(node.ext_neighbor_port, connect_port);
+
+//     /* Add as external neighbor */
+//     add_neighbor(connect_ip, connect_port, fd, 1);
+
+//     /* Send ENTRY message */
+//     if (send_entry_message(fd, node.ip, node.port) < 0)
+//     {
+//         printf("Failed to send ENTRY message.\n");
+//         close(fd);
+//         return -1;
+//     }
+
+//     /* Set network ID */
+//     node.network_id = atoi(net);
+//     node.in_network = 1;
+
+//     printf("Joined network %s through %s:%s\n", net, connect_ip, connect_port);
+//     return 0;
+// }
 /**
  * Directly join a network or create a new one without registering with the server.
  *
@@ -727,12 +811,14 @@ int cmd_leave()
     /* Reinicia o estado do nó */
     node.neighbors = NULL;
     node.internal_neighbors = NULL;
-    strcpy(node.ext_neighbor_ip, node.ip);
-    strcpy(node.ext_neighbor_port, node.port);
+    
+    /* Reset external neighbor and safety node information when leaving network */
+    memset(node.ext_neighbor_ip, 0, INET_ADDRSTRLEN);
+    memset(node.ext_neighbor_port, 0, 6);
     memset(node.safe_node_ip, 0, INET_ADDRSTRLEN);
     memset(node.safe_node_port, 0, 6);
+    
     node.in_network = 0;
-
     printf("Left network %03d\n", node.network_id);
     return 0;
 }
