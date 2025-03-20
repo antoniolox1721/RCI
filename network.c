@@ -232,11 +232,7 @@ int handle_safe_message(int fd, char *ip, char *port)
                          strcmp(node.ip, node.safe_node_ip) == 0 && 
                          strcmp(node.port, node.safe_node_port) == 0);
     
-    if (is_network_creator || is_second_node) {
-        printf("As network creator or second node, ignoring incoming SAFE message\n");
-        printf("Keeping self as safety node: %s:%s\n", node.safe_node_ip, node.safe_node_port);
-        return 0;
-    }
+    if (is_network_creator || is_second_node) {}
 
     /* For other nodes, update safety node information using exactly the IP and port from the message */
     strcpy(node.safe_node_ip, ip);
