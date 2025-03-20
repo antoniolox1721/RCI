@@ -9,7 +9,7 @@
 #include "network.h"
 #include "objects.h"
 #include "debug_utils.h"
-
+#include "ndn.h"
 /**
  * Processa um comando do utilizador.
  *
@@ -616,43 +616,69 @@ int cmd_retrieve(char *name)
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
-int cmd_show_topology()
-{
-    printf("Node: %s:%s\n", node.ip, node.port);
-    printf("External neighbor: %s:%s\n", node.ext_neighbor_ip, node.ext_neighbor_port);
-
-    if (strlen(node.safe_node_ip) > 0)
-    {
-        printf("Safety node: %s:%s", node.safe_node_ip, node.safe_node_port);
-
-        /* Mostra se este nó é o seu próprio nó de salvaguarda */
-        if (strcmp(node.safe_node_ip, node.ip) == 0 &&
-            strcmp(node.safe_node_port, node.port) == 0)
-        {
-            printf(" (self)");
+int cmd_show_topology() {
+    printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, COLOR_BLUE, COLOR_RESET);
+    printf("%s%s│               NETWORK TOPOLOGY                     │%s\n", COLOR_BOLD, COLOR_BLUE, COLOR_RESET);
+    printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, COLOR_BLUE, COLOR_RESET);
+    
+    printf("%s%sNODE IDENTITY:%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    printf("  %-15s: %s%s:%s%s\n", "This Node", COLOR_CYAN, node.ip, node.port, COLOR_RESET);
+    
+    if (node.in_network) {
+        printf("  %-15s: %s%03d%s\n", "Network ID", COLOR_CYAN, node.network_id, COLOR_RESET);
+    } else {
+        printf("  %-15s: %sNot in a network%s\n", "Network ID", COLOR_RED, COLOR_RESET);
+    }
+    
+    printf("\n%s%sCONNECTIONS:%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    
+    // External neighbor
+    if (strlen(node.ext_neighbor_ip) > 0) {
+        printf("  %-15s: %s%s:%s%s", "External", COLOR_CYAN, node.ext_neighbor_ip, node.ext_neighbor_port, COLOR_RESET);
+        
+        // Check if external neighbor is self
+        if (strcmp(node.ext_neighbor_ip, node.ip) == 0 && 
+            strcmp(node.ext_neighbor_port, node.port) == 0) {
+            printf(" %s(self - standalone node)%s", COLOR_YELLOW, COLOR_RESET);
         }
         printf("\n");
+    } else {
+        printf("  %-15s: %sNone%s\n", "External", COLOR_RED, COLOR_RESET);
     }
-    else
-    {
-        printf("Safety node: Not set\n");
+    
+    // Safety node
+    if (strlen(node.safe_node_ip) > 0) {
+        printf("  %-15s: %s%s:%s%s", "Safety", COLOR_CYAN, node.safe_node_ip, node.safe_node_port, COLOR_RESET);
+        
+        // Check if safety node is self
+        if (strcmp(node.safe_node_ip, node.ip) == 0 && 
+            strcmp(node.safe_node_port, node.port) == 0) {
+            printf(" %s(self)%s", COLOR_YELLOW, COLOR_RESET);
+        }
+        printf("\n");
+    } else {
+        printf("  %-15s: %sNot set%s\n", "Safety", COLOR_RED, COLOR_RESET);
     }
-
-    printf("Internal neighbors:\n");
+    
+    // Internal neighbors
+    printf("\n%s%sINTERNAL NEIGHBORS:%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
     Neighbor *curr = node.internal_neighbors;
-    if (curr == NULL)
-    {
-        printf("  None\n");
-    }
-    else
-    {
-        while (curr != NULL)
-        {
-            printf("  %s:%s (interface: %d)\n", curr->ip, curr->port, curr->interface_id);
+    
+    if (curr == NULL) {
+        printf("  %sNone%s\n", COLOR_RED, COLOR_RESET);
+    } else {
+        int count = 0;
+        while (curr != NULL) {
+            printf("  %s%d.%s %s%-24s%s (interface: %s%d%s, fd: %d)\n", 
+                   COLOR_GREEN, ++count, COLOR_RESET,
+                   COLOR_CYAN, curr->ip, COLOR_RESET,
+                   COLOR_YELLOW, curr->interface_id, COLOR_RESET,
+                   curr->fd);
             curr = curr->next;
         }
     }
-
+    
+    printf("\n");
     return 0;
 }
 
@@ -661,24 +687,68 @@ int cmd_show_topology()
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
-int cmd_show_names()
-{
-    printf("Objects:\n");
-    Object *obj = node.objects;
-    while (obj != NULL)
-    {
-        printf("  %s\n", obj->name);
+int cmd_show_names() {
+    int local_count = 0;
+    int cache_count = 0;
+    Object *obj;
+    
+    // Count objects first
+    obj = node.objects;
+    while (obj != NULL) {
+        local_count++;
         obj = obj->next;
     }
-
-    printf("Cache:\n");
+    
     obj = node.cache;
-    while (obj != NULL)
-    {
-        printf("  %s\n", obj->name);
+    while (obj != NULL) {
+        cache_count++;
         obj = obj->next;
     }
-
+    
+    // Print header
+    printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s│               STORED OBJECTS                       │%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    
+    // Print local objects
+    printf("%s%sLOCAL OBJECTS (%d):%s\n", COLOR_BOLD, COLOR_GREEN, local_count, COLOR_RESET);
+    if (local_count == 0) {
+        printf("  No objects stored locally\n");
+    } else {
+        int col = 0;
+        obj = node.objects;
+        while (obj != NULL) {
+            printf("  %s%-24s%s", COLOR_GREEN, obj->name, COLOR_RESET);
+            col++;
+            if (col == 3) {
+                printf("\n");
+                col = 0;
+            }
+            obj = obj->next;
+        }
+        if (col != 0) printf("\n");  // End the line if not already done
+    }
+    
+    // Print cache objects
+    printf("\n%s%sCACHED OBJECTS (%d/%d):%s\n", COLOR_BOLD, COLOR_YELLOW, cache_count, node.cache_size, COLOR_RESET);
+    if (cache_count == 0) {
+        printf("  Cache is empty\n");
+    } else {
+        int col = 0;
+        obj = node.cache;
+        while (obj != NULL) {
+            printf("  %s%-24s%s", COLOR_YELLOW, obj->name, COLOR_RESET);
+            col++;
+            if (col == 3) {
+                printf("\n");
+                col = 0;
+            }
+            obj = obj->next;
+        }
+        if (col != 0) printf("\n");  // End the line if not already done
+    }
+    
+    printf("\n");
     return 0;
 }
 
@@ -687,32 +757,105 @@ int cmd_show_names()
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
-int cmd_show_interest_table()
-{
-    printf("Interest table:\n");
+int cmd_show_interest_table() {
     InterestEntry *entry = node.interest_table;
-    while (entry != NULL)
-    {
-        printf("  %s:", entry->name);
-        for (int i = 0; i < MAX_INTERFACE; i++)
-        {
-            if (entry->interface_states[i] == RESPONSE)
-            {
-                printf(" %d:response", i);
-            }
-            else if (entry->interface_states[i] == WAITING)
-            {
-                printf(" %d:waiting", i);
-            }
-            else if (entry->interface_states[i] == CLOSED)
-            {
-                printf(" %d:closed", i);
-            }
+    int entry_count = 0;
+    
+    printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    printf("%s%s│               INTEREST TABLE                       │%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    
+    if (entry == NULL) {
+        printf("%sNo active interests%s\n\n", COLOR_YELLOW, COLOR_RESET);
+        return 0;
+    }
+
+    while (entry != NULL) {
+        entry_count++;
+        printf("%s%sINTEREST:%s \"%s%s%s\"\n", 
+               COLOR_BOLD, COLOR_BLUE, COLOR_RESET, 
+               COLOR_CYAN, entry->name, COLOR_RESET);
+        
+        int response_count = 0;
+        int waiting_count = 0;
+        int closed_count = 0;
+        
+        // First, count each type
+        for (int i = 0; i < MAX_INTERFACE; i++) {
+            if (entry->interface_states[i] == RESPONSE) response_count++;
+            else if (entry->interface_states[i] == WAITING) waiting_count++;
+            else if (entry->interface_states[i] == CLOSED) closed_count++;
         }
+        
+        printf("  %sSummary:%s %s%d response%s, %s%d waiting%s, %s%d closed%s\n", 
+               COLOR_BOLD, COLOR_RESET,
+               COLOR_GREEN, response_count, COLOR_RESET, 
+               COLOR_YELLOW, waiting_count, COLOR_RESET,
+               COLOR_RED, closed_count, COLOR_RESET);
+        
+        // Then list each interface with a state
+        printf("  %sInterfaces:%s\n", COLOR_BOLD, COLOR_RESET);
+        
+        // First RESPONSE interfaces (most important)
+        if (response_count > 0) {
+            printf("    %s%sRESPONSE:%s ", COLOR_BOLD, COLOR_GREEN, COLOR_RESET);
+            int first = 1;
+            for (int i = 0; i < MAX_INTERFACE; i++) {
+                if (entry->interface_states[i] == RESPONSE) {
+                    if (!first) printf(", ");
+                    
+                    if (i == MAX_INTERFACE - 1) {
+                        printf("%sLOCAL%s", COLOR_CYAN, COLOR_RESET);
+                    } else {
+                        printf("%s%d%s", COLOR_GREEN, i, COLOR_RESET);
+                    }
+                    
+                    first = 0;
+                }
+            }
+            printf("\n");
+        }
+        
+        // Then WAITING interfaces
+        if (waiting_count > 0) {
+            printf("    %s%sWAITING: %s ", COLOR_BOLD, COLOR_YELLOW, COLOR_RESET);
+            int first = 1;
+            for (int i = 0; i < MAX_INTERFACE; i++) {
+                if (entry->interface_states[i] == WAITING) {
+                    if (!first) printf(", ");
+                    printf("%s%d%s", COLOR_YELLOW, i, COLOR_RESET);
+                    first = 0;
+                }
+            }
+            printf("\n");
+        }
+        
+        // Then CLOSED interfaces (least important)
+        if (closed_count > 0) {
+            printf("    %s%sCLOSED:  %s ", COLOR_BOLD, COLOR_RED, COLOR_RESET);
+            int first = 1;
+            for (int i = 0; i < MAX_INTERFACE; i++) {
+                if (entry->interface_states[i] == CLOSED) {
+                    if (!first) printf(", ");
+                    printf("%s%d%s", COLOR_RED, i, COLOR_RESET);
+                    first = 0;
+                }
+            }
+            printf("\n");
+        }
+        
+        // Show age of interest
+        time_t now = time(NULL);
+        int age = (int)difftime(now, entry->timestamp);
+        printf("  %sAge:%s %s%d seconds%s\n", 
+               COLOR_BOLD, COLOR_RESET, 
+               (age > 5) ? COLOR_YELLOW : COLOR_GREEN, age, COLOR_RESET);
+        
         printf("\n");
         entry = entry->next;
     }
-
+    
+    printf("%s%sTotal entries: %d%s\n\n", COLOR_BOLD, COLOR_BLUE, entry_count, COLOR_RESET);
     return 0;
 }
 

@@ -184,119 +184,170 @@ void handle_user_input()
  * @param reg_ip Endereço IP do servidor de registo
  * @param reg_udp Porto UDP do servidor de registo
  */
-void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg_udp)
-{
+/**
+ * Initialize the node with colorful user interface.
+ * 
+ * @param cache_size Maximum cache size
+ * @param ip Node IP address
+ * @param port Node TCP port
+ * @param reg_ip Registration server IP
+ * @param reg_udp Registration server UDP port
+ */
+void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg_udp) {
     struct addrinfo hints, *res;
     int errcode;
 
-    /* Inicializa a estrutura do nó */
+    /* Initialize the node structure */
     memset(&node, 0, sizeof(Node));
     node.cache_size = cache_size;
     node.current_cache_size = 0;
     
-    /* Armazena informações do nó local */
+    /* Store local node information */
     strncpy(node.ip, ip, INET_ADDRSTRLEN-1);
     node.ip[INET_ADDRSTRLEN-1] = '\0';
     
     strncpy(node.port, port, 5);
     node.port[5] = '\0';
     
-    /* Inicialmente, o vizinho externo é o próprio nó */
+    /* Initially, external neighbor is self */
     strncpy(node.ext_neighbor_ip, ip, INET_ADDRSTRLEN-1);
     node.ext_neighbor_ip[INET_ADDRSTRLEN-1] = '\0';
     
     strncpy(node.ext_neighbor_port, port, 5);
     node.ext_neighbor_port[5] = '\0';
     
-    /* Armazena informações do servidor de registo */
+    /* Store registration server information */
     strncpy(node.reg_server_ip, reg_ip, INET_ADDRSTRLEN-1);
     node.reg_server_ip[INET_ADDRSTRLEN-1] = '\0';
     
     snprintf(node.reg_server_port, 6, "%d", reg_udp);
     
-    node.in_network = 0; /* Não está numa rede inicialmente */
+    node.in_network = 0; /* Not in a network initially */
     node.max_fd = 0;
 
-    /* Cria o socket TCP de escuta */
+    /* Create TCP listening socket */
     node.listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (node.listen_fd == -1)
-    {
+    if (node.listen_fd == -1) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
 
-    /* Permite reutilização do endereço */
+    /* Allow address reuse */
     int reuse = 1;
-    if (setsockopt(node.listen_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
-    {
+    if (setsockopt(node.listen_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1) {
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
 
-    /* Liga o socket ao IP e porto especificados */
+    /* Bind socket to specified IP and port */
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if ((errcode = getaddrinfo(NULL, port, &hints, &res)) != 0)
-    {
+    if ((errcode = getaddrinfo(NULL, port, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
         exit(EXIT_FAILURE);
     }
 
-    if (bind(node.listen_fd, res->ai_addr, res->ai_addrlen) == -1)
-    {
+    if (bind(node.listen_fd, res->ai_addr, res->ai_addrlen) == -1) {
         perror("bind");
         exit(EXIT_FAILURE);
     }
 
-    /* Começa a escuta de ligações */
-    if (listen(node.listen_fd, 5) == -1)
-    {
+    /* Start listening for connections */
+    if (listen(node.listen_fd, 5) == -1) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
 
-    /* Atualiza max_fd */
+    /* Update max_fd */
     node.max_fd = node.listen_fd;
 
-    /* Cria o socket UDP para comunicação com o servidor de registo */
+    /* Create UDP socket for registration server communication */
     node.reg_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (node.reg_fd == -1)
-    {
+    if (node.reg_fd == -1) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
 
-    /* Atualiza max_fd se necessário */
-    if (node.reg_fd > node.max_fd)
-    {
+    /* Update max_fd if needed */
+    if (node.reg_fd > node.max_fd) {
         node.max_fd = node.reg_fd;
     }
 
     freeaddrinfo(res);
     
-    /* Interface de utilizador melhorada */
+    /* Enhanced user interface with colors */
     printf("\n");
-    printf("╔══════════════════════════════════════════════════════════════╗\n");
-    printf("║        Rede de Dados Identificados por Nome (NDN)            ║\n");
-    printf("║                  Versão 1.0 - 2024/2025                      ║\n");
-    printf("╠══════════════════════════════════════════════════════════════╣\n");
-    printf("║ Nó inicializado com:                                         ║\n");
-    printf("║ • Endereço IP: %-45s ║\n", ip);
-    printf("║ • Porto TCP: %-46s ║\n", port);
-    printf("║ • Tamanho da cache: %-42d ║\n", cache_size);
-    printf("║ • Servidor de registo: %s:%-37d ║\n", reg_ip, reg_udp);
-    printf("╠══════════════════════════════════════════════════════════════╣\n");
-    printf("║ Comandos Principais:                                         ║\n");
-    printf("║ • j <rede>        - Entrar numa rede                         ║\n");
-    printf("║ • dj <IP> <TCP>   - Entrar diretamente numa rede             ║\n");
-    printf("║ • c <nome>        - Criar objeto                             ║\n");
-    printf("║ • r <nome>        - Obter objeto                             ║\n");
-    printf("║ • st              - Mostrar topologia                         ║\n");
-    printf("║ • help            - Mostrar todos os comandos                ║\n");
-    printf("╚══════════════════════════════════════════════════════════════╝\n");
+    printf("%s%s╔══════════════════════════════════════════════════════════════╗%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s        %sRede de Dados Identificados por Nome (NDN)%s            %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_BOLD, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s                  %sVersão 1.0 - 2024/2025%s                      %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_YELLOW, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s╠══════════════════════════════════════════════════════════════╣%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s %sNó inicializado com:%s                                         %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_BOLD, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • Endereço IP: %s%-45s%s %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_GREEN, ip, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • Porto TCP: %s%-46s%s %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_GREEN, port, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • Tamanho da cache: %s%-42d%s %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_GREEN, cache_size, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • Servidor de registo: %s%s:%-37d%s %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_GREEN, reg_ip, reg_udp, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s╠══════════════════════════════════════════════════════════════╣%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s %sComandos Principais:%s                                         %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_BOLD, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sj <rede>%s        - Entrar numa rede                         %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sdj <IP> <TCP>%s   - Entrar diretamente numa rede             %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sc <nome>%s        - Criar objeto                             %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sr <nome>%s        - Obter objeto                             %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sst%s              - Mostrar topologia                        %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %ssi%s              - Mostrar tabela de interesses             %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %ssn%s              - Mostrar objetos                          %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %shelp%s            - Mostrar todos os comandos                %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s╚══════════════════════════════════════════════════════════════╝%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
     printf("\n");
 }
 
