@@ -396,9 +396,9 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
         strcpy(node.ext_neighbor_ip, "");
         strcpy(node.ext_neighbor_port, "");
 
-        /* Node is its own safety node */
-        strcpy(node.safe_node_ip, node.ip);
-        strcpy(node.safe_node_port, node.port);
+        /* Initially, safety node is left empty until second node joins */
+        strcpy(node.safe_node_ip, "");
+        strcpy(node.safe_node_port, "");
 
         printf("Standalone node created for network %s - waiting for connections\n", net);
         return 0;

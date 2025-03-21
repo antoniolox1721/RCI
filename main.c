@@ -209,12 +209,13 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
     strncpy(node.port, port, 5);
     node.port[5] = '\0';
     
-    /* Initially, external neighbor is self */
-    strncpy(node.ext_neighbor_ip, ip, INET_ADDRSTRLEN-1);
-    node.ext_neighbor_ip[INET_ADDRSTRLEN-1] = '\0';
+    /* Initially, no external neighbor */
+    node.ext_neighbor_ip[0] = '\0';
+    node.ext_neighbor_port[0] = '\0';
     
-    strncpy(node.ext_neighbor_port, port, 5);
-    node.ext_neighbor_port[5] = '\0';
+    /* Initially, no safety node */
+    node.safe_node_ip[0] = '\0';
+    node.safe_node_port[0] = '\0';
     
     /* Store registration server information */
     strncpy(node.reg_server_ip, reg_ip, INET_ADDRSTRLEN-1);
