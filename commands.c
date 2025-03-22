@@ -9,190 +9,161 @@
 #include "network.h"
 #include "objects.h"
 #include "debug_utils.h"
-
+#include "ndn.h"
 /**
  * Processa um comando do utilizador.
  *
  * @param cmd String contendo o comando a processar
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
-int process_command(char *cmd)
-{
+int process_command(char *cmd) {
     char original_cmd[MAX_CMD_SIZE];
     strncpy(original_cmd, cmd, MAX_CMD_SIZE - 1);
     original_cmd[MAX_CMD_SIZE - 1] = '\0';
 
-    /* Ignora espaços em branco iniciais */
-    while (*cmd && isspace(*cmd))
-    {
+    /* Skip leading whitespace */
+    while (*cmd && isspace(*cmd)) {
         cmd++;
     }
 
-    if (*cmd == '\0')
-    {
-        return 0; /* Comando vazio */
+    if (*cmd == '\0') {
+        return 0; /* Empty command */
     }
 
-    /* Extrai o nome do comando (primeira palavra) */
+    /* Extract command name (first word) */
     char cmd_name[MAX_CMD_SIZE];
     int i = 0;
-    while (cmd[i] && !isspace(cmd[i]) && i < MAX_CMD_SIZE - 1)
-    {
-        cmd_name[i] = tolower(cmd[i]); /* Converte para minúsculas */
+    while (cmd[i] && !isspace(cmd[i]) && i < MAX_CMD_SIZE - 1) {
+        cmd_name[i] = tolower(cmd[i]); /* Convert to lowercase */
         i++;
     }
     cmd_name[i] = '\0';
 
-    /* Trata o comando "create" de forma especial */
-    if (strcmp(cmd_name, "create") == 0 || strcmp(cmd_name, "c") == 0)
-    {
-        /* Avança para os parâmetros (após o comando e espaços) */
-        char *params = cmd + i;
-        while (*params && isspace(*params))
-        {
-            params++;
-        }
+    /* Advance to parameters (after the command and spaces) */
+    char *params = cmd + i;
+    while (*params && isspace(*params)) {
+        params++;
+    }
 
-        /* Verifica se há espaços no nome do objeto */
-        char *space_check = params;
-        while (*space_check)
-        {
-            if (isspace(*space_check))
-            {
-                printf("Invalid object name. Object names cannot contain spaces.\n");
-                return -1;
-            }
-            space_check++;
+    /* Check for commands that need special handling for multi-word arguments */
+    if (strcmp(cmd_name, "retrieve") == 0 || strcmp(cmd_name, "r") == 0 ||
+        strcmp(cmd_name, "create") == 0 || strcmp(cmd_name, "c") == 0 ||
+        strcmp(cmd_name, "delete") == 0 || strcmp(cmd_name, "dl") == 0) {
+        
+        /* For these commands, we need to ensure the arguments don't contain spaces */
+        char object_name[MAX_OBJECT_NAME + 1] = {0};
+        
+        /* Extract the first word as the object name */
+        i = 0;
+        while (params[i] && !isspace(params[i]) && i < MAX_OBJECT_NAME) {
+            object_name[i] = params[i];
+            i++;
         }
-
-        if (*params)
-        {
-            return cmd_create(params);
+        object_name[i] = '\0';
+        
+        /* Check if there are more words after the object name */
+        char *next_param = params + i;
+        while (*next_param && isspace(*next_param)) {
+            next_param++;
         }
-        else
-        {
-            printf("Usage: create (c) <name>\n");
+        
+        /* If there are more words, display an error */
+        if (*next_param) {
+            printf("%sError: Object name cannot contain spaces. Found: \"%s %s\"%s\n", 
+                   COLOR_RED, object_name, next_param, COLOR_RESET);
             return -1;
         }
+        
+        /* Process the command with the validated object name */
+        if (strcmp(cmd_name, "retrieve") == 0 || strcmp(cmd_name, "r") == 0) {
+            if (*object_name) {
+                return cmd_retrieve(object_name);
+            } else {
+                printf("%sUsage: retrieve (r) <name>%s\n", COLOR_RED, COLOR_RESET);
+                return -1;
+            }
+        } else if (strcmp(cmd_name, "create") == 0 || strcmp(cmd_name, "c") == 0) {
+            if (*object_name) {
+                return cmd_create(object_name);
+            } else {
+                printf("%sUsage: create (c) <name>%s\n", COLOR_RED, COLOR_RESET);
+                return -1;
+            }
+        } else if (strcmp(cmd_name, "delete") == 0 || strcmp(cmd_name, "dl") == 0) {
+            if (*object_name) {
+                return cmd_delete(object_name);
+            } else {
+                printf("%sUsage: delete (dl) <name>%s\n", COLOR_RED, COLOR_RESET);
+                return -1;
+            }
+        }
     }
 
-    /* Para os restantes comandos, usa strtok para análise */
+    /* Handle other commands using strtok for parsing */
     char *token = strtok(cmd, " \n");
-    /* Ignora o token do nome do comando, já processado acima */
+    /* Skip the command name token, already processed above */
     token = strtok(NULL, " \n");
 
-    if (strcmp(cmd_name, "join") == 0 || strcmp(cmd_name, "j") == 0)
-    {
-        if (token != NULL)
-        {
+    if (strcmp(cmd_name, "join") == 0 || strcmp(cmd_name, "j") == 0) {
+        if (token != NULL) {
             return cmd_join(token);
+        } else {
+            printf("%sUsage: join (j) <net>%s\n", COLOR_RED, COLOR_RESET);
+            return -1;
         }
-        else
-        {
-            printf("Usage: join (j) <net>\n");
-        }
-    }
-    else if (strcmp(cmd_name, "direct") == 0 || strcmp(cmd_name, "dj") == 0)
-    {
-        char *connect_ip = token;                // Primeiro token após o comando é o IP
-        char *connect_tcp = strtok(NULL, " \n"); // Segundo token é o porto TCP
+    } else if (strcmp(cmd_name, "direct") == 0 || strcmp(cmd_name, "dj") == 0) {
+        char *connect_ip = token;                /* First token after command is IP */
+        char *connect_tcp = strtok(NULL, " \n"); /* Second token is TCP port */
 
-        if (connect_ip != NULL && connect_tcp != NULL)
-        {
+        if (connect_ip != NULL && connect_tcp != NULL) {
             return cmd_direct_join(connect_ip, connect_tcp);
+        } else {
+            printf("%sUsage: direct join (dj) <connectIP> <connectTCP>%s\n", COLOR_RED, COLOR_RESET);
+            return -1;
         }
-        else
-        {
-            printf("Usage: direct join (dj) <connectIP> <connectTCP>\n");
-        }
-    }
-    else if (strcmp(cmd_name, "delete") == 0 || strcmp(cmd_name, "dl") == 0)
-    {
-        if (token != NULL)
-        {
-            return cmd_delete(token);
-        }
-        else
-        {
-            printf("Usage: delete (dl) <name>\n");
-        }
-    }
-    else if (strcmp(cmd_name, "retrieve") == 0 || strcmp(cmd_name, "r") == 0)
-    {
-        if (token != NULL)
-        {
-            return cmd_retrieve(token);
-        }
-        else
-        {
-            printf("Usage: retrieve (r) <name>\n");
-        }
-    }
-    else if (strcmp(cmd_name, "show") == 0 || strcmp(cmd_name, "s") == 0)
-    {
-        if (token != NULL)
-        {
+    } else if (strcmp(cmd_name, "show") == 0 || strcmp(cmd_name, "s") == 0) {
+        if (token != NULL) {
             char what[MAX_CMD_SIZE];
             strncpy(what, token, MAX_CMD_SIZE - 1);
             what[MAX_CMD_SIZE - 1] = '\0';
 
-            /* Converte para minúsculas */
-            for (int i = 0; what[i]; i++)
-            {
+            /* Convert to lowercase */
+            for (int i = 0; what[i]; i++) {
                 what[i] = tolower(what[i]);
             }
 
-            if (strcmp(what, "topology") == 0)
-            {
+            if (strcmp(what, "topology") == 0) {
                 return cmd_show_topology();
-            }
-            else if (strcmp(what, "names") == 0)
-            {
+            } else if (strcmp(what, "names") == 0) {
                 return cmd_show_names();
-            }
-            else if (strcmp(what, "interest") == 0 || strcmp(what, "table") == 0)
-            {
+            } else if (strcmp(what, "interest") == 0 || strcmp(what, "table") == 0) {
                 return cmd_show_interest_table();
+            } else {
+                printf("%sUnknown show command: %s%s\n", COLOR_RED, what, COLOR_RESET);
+                return -1;
             }
-            else
-            {
-                printf("Unknown show command: %s\n", what);
-            }
-        }
-        else
-        {
-            printf("Usage: show <topology|names|interest>\n");
+        } else {
+            printf("%sUsage: show <topology|names|interest>%s\n", COLOR_RED, COLOR_RESET);
+            return -1;
         }
     }
-    /* Trata abreviaturas diretas */
-    else if (strcmp(cmd_name, "st") == 0)
-    {
+    /* Handle direct abbreviations */
+    else if (strcmp(cmd_name, "st") == 0) {
         return cmd_show_topology();
-    }
-    else if (strcmp(cmd_name, "sn") == 0)
-    {
+    } else if (strcmp(cmd_name, "sn") == 0) {
         return cmd_show_names();
-    }
-    else if (strcmp(cmd_name, "si") == 0)
-    {
+    } else if (strcmp(cmd_name, "si") == 0) {
         return cmd_show_interest_table();
-    }
-    else if (strcmp(cmd_name, "leave") == 0 || strcmp(cmd_name, "l") == 0)
-    {
+    } else if (strcmp(cmd_name, "leave") == 0 || strcmp(cmd_name, "l") == 0) {
         return cmd_leave();
-    }
-    else if (strcmp(cmd_name, "exit") == 0 || strcmp(cmd_name, "x") == 0)
-    {
+    } else if (strcmp(cmd_name, "exit") == 0 || strcmp(cmd_name, "x") == 0) {
         return cmd_exit();
-    }
-    else if (strcmp(cmd_name, "help") == 0 || strcmp(cmd_name, "h") == 0)
-    {
+    } else if (strcmp(cmd_name, "help") == 0 || strcmp(cmd_name, "h") == 0) {
         print_help();
         return 0;
-    }
-    else
-    {
-        printf("Unknown command: %s\n", cmd_name);
+    } else {
+        printf("%sUnknown command: %s%s\n", COLOR_RED, cmd_name, COLOR_RESET);
+        return -1;
     }
 
     return -1;
@@ -229,14 +200,14 @@ int cmd_join(char *net)
 {
     if (node.in_network)
     {
-        printf("Already in a network. Leave first.\n");
+        printf("%sAlready in a network. Leave first.%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
     /* Verifica se o ID da rede é válido (3 dígitos) */
     if (strlen(net) != 3 || !isdigit(net[0]) || !isdigit(net[1]) || !isdigit(net[2]))
     {
-        printf("Invalid network ID. Must be exactly 3 digits.\n");
+        printf("%sInvalid network ID. Must be exactly 3 digits.%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
@@ -246,7 +217,7 @@ int cmd_join(char *net)
     /* Solicita a lista de nós na rede */
     if (send_nodes_request(net) < 0)
     {
-        printf("Failed to send NODES request.\n");
+        printf("%sFailed to send NODES request.%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
@@ -266,7 +237,7 @@ int cmd_join(char *net)
     }
 
     int bytes_received = recvfrom(node.reg_fd, buffer, MAX_BUFFER - 1, 0,
-                                  (struct sockaddr *)&server_addr, &addr_len);
+                                 (struct sockaddr *)&server_addr, &addr_len);
 
     if (bytes_received <= 0)
     {
@@ -274,7 +245,7 @@ int cmd_join(char *net)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
-                printf("Timeout waiting for response from registration server\n");
+                printf("%sTimeout waiting for response from registration server%s\n", COLOR_RED, COLOR_RESET);
             }
             else
             {
@@ -283,7 +254,7 @@ int cmd_join(char *net)
         }
         else
         {
-            printf("Empty response from registration server\n");
+            printf("%sEmpty response from registration server%s\n", COLOR_RED, COLOR_RESET);
         }
         return -1;
     }
@@ -295,17 +266,19 @@ int cmd_join(char *net)
     char response_net[4] = {0};
     if (sscanf(buffer, "NODESLIST %3s", response_net) != 1 || strcmp(response_net, net) != 0)
     {
-        printf("Invalid or mismatched NODESLIST response: %s\n", buffer);
+        printf("%sInvalid or mismatched NODESLIST response: %s%s\n", COLOR_RED, buffer, COLOR_RESET);
         return -1;
     }
 
     /* Processa a resposta NODESLIST */
     if (process_nodeslist_response(buffer) < 0)
     {
-        printf("Failed to process NODESLIST response.\n");
+        printf("%sFailed to process NODESLIST response.%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
+    printf("%sSuccessfully processed join request for network %s%s\n", 
+           COLOR_GREEN, net, COLOR_RESET);
     return 0;
 }
 // /**
@@ -405,7 +378,7 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     /* Check if already in a network */
     if (node.in_network)
     {
-        printf("Error: Already in network %03d. Leave first.\n", node.network_id);
+        printf("%sError: Already in network %03d. Leave first.%s\n", COLOR_RED, node.network_id, COLOR_RESET);
         return -1;
     }
 
@@ -429,7 +402,8 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
         strcpy(node.safe_node_ip, node.ip);
         strcpy(node.safe_node_port, node.port);
 
-        printf("Standalone node created for network %s - waiting for connections\n", net);
+        printf("%sStandalone node created successfully for network %s - waiting for connections%s\n", 
+               COLOR_GREEN, net, COLOR_RESET);
         return 0;
     }
 
@@ -440,7 +414,7 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     int fd = connect_to_node(connect_ip, connect_port);
     if (fd < 0)
     {
-        printf("Failed to connect to %s:%s\n", connect_ip, connect_port);
+        printf("%sFailed to connect to %s:%s%s\n", COLOR_RED, connect_ip, connect_port, COLOR_RESET);
         return -1;
     }
 
@@ -454,7 +428,7 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     /* Send ENTRY message */
     if (send_entry_message(fd, node.ip, node.port) < 0)
     {
-        printf("Failed to send ENTRY message.\n");
+        printf("%sFailed to send ENTRY message.%s\n", COLOR_RED, COLOR_RESET);
         close(fd);
         return -1;
     }
@@ -463,7 +437,8 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     node.network_id = atoi(net);
     node.in_network = 1;
 
-    printf("Joined network %s through %s:%s\n", net, connect_ip, connect_port);
+    printf("%sSuccessfully joined network %s through %s:%s%s\n", 
+           COLOR_GREEN, net, connect_ip, connect_port, COLOR_RESET);
     return 0;
 }
 
@@ -478,23 +453,24 @@ int cmd_create(char *name)
     /* Verifica se o nome contém espaços */
     if (strchr(name, ' ') != NULL)
     {
-        printf("Invalid object name. Object names cannot contain spaces.\n");
+        printf("%sInvalid object name. Object names cannot contain spaces.%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
     if (!is_valid_name(name))
     {
-        printf("Invalid object name. Must be alphanumeric and up to %d characters.\n", MAX_OBJECT_NAME);
+        printf("%sInvalid object name. Must be alphanumeric and up to %d characters.%s\n", 
+               COLOR_RED, MAX_OBJECT_NAME, COLOR_RESET);
         return -1;
     }
 
     if (add_object(name) < 0)
     {
-        printf("Failed to create object %s\n", name);
+        printf("%sFailed to create object %s%s\n", COLOR_RED, name, COLOR_RESET);
         return -1;
     }
 
-    printf("Created object %s\n", name);
+    printf("%sSuccessfully created object '%s'%s\n", COLOR_GREEN, name, COLOR_RESET);
     return 0;
 }
 
@@ -508,17 +484,18 @@ int cmd_delete(char *name)
 {
     if (!is_valid_name(name))
     {
-        printf("Invalid object name. Must be alphanumeric and up to %d characters.\n", MAX_OBJECT_NAME);
+        printf("%sInvalid object name. Must be alphanumeric and up to %d characters.%s\n", 
+               COLOR_RED, MAX_OBJECT_NAME, COLOR_RESET);
         return -1;
     }
 
     if (remove_object(name) < 0)
     {
-        printf("Object %s not found\n", name);
+        printf("%sObject %s not found%s\n", COLOR_RED, name, COLOR_RESET);
         return -1;
     }
 
-    printf("Deleted object %s\n", name);
+    printf("%sSuccessfully deleted object '%s'%s\n", COLOR_GREEN, name, COLOR_RESET);
     return 0;
 }
 
@@ -531,37 +508,50 @@ int cmd_delete(char *name)
  */
 int cmd_retrieve(char *name)
 {
+    if (name == NULL || strlen(name) == 0)
+    {
+        printf("%sError: Object name is required%s\n", COLOR_RED, COLOR_RESET);
+        return -1;
+    }
+
+    /* Check for spaces in name */
+    if (strchr(name, ' ') != NULL)
+    {
+        printf("%sError: Object name cannot contain spaces%s\n", COLOR_RED, COLOR_RESET);
+        return -1;
+    }
     if (!is_valid_name(name))
     {
-        printf("Invalid object name. Must be alphanumeric and up to %d characters.\n", MAX_OBJECT_NAME);
+        printf("%sInvalid object name. Must be alphanumeric and up to %d characters.%s\n", 
+               COLOR_RED, MAX_OBJECT_NAME, COLOR_RESET);
         return -1;
     }
 
     /* Verifica se o objeto existe localmente */
     if (find_object(name) >= 0)
     {
-        printf("Object %s found locally\n", name);
+        printf("%sObject '%s' found locally%s\n", COLOR_GREEN, name, COLOR_RESET);
         return 0;
     }
 
     /* Verifica se o objeto existe na cache */
     if (find_in_cache(name) >= 0)
     {
-        printf("Object %s found in cache\n", name);
+        printf("%sObject '%s' found in cache%s\n", COLOR_GREEN, name, COLOR_RESET);
         return 0;
     }
 
     /* Verifica se está numa rede */
     if (!node.in_network)
     {
-        printf("Not in a network, can't retrieve remote objects\n");
+        printf("%sNot in a network, can't retrieve remote objects%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
     /* Verifica se tem vizinhos */
     if (node.neighbors == NULL)
     {
-        printf("No neighbors to send interest message to\n");
+        printf("%sNo neighbors to send interest message to%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
@@ -569,7 +559,7 @@ int cmd_retrieve(char *name)
     InterestEntry *entry = find_or_create_interest_entry(name);
     if (entry == NULL)
     {
-        printf("Failed to create interest entry\n");
+        printf("%sFailed to create interest entry%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
@@ -603,11 +593,12 @@ int cmd_retrieve(char *name)
 
     if (sent_count == 0)
     {
-        printf("No neighbors to send interest message to.\n");
+        printf("%sNo neighbors to send interest message to.%s\n", COLOR_RED, COLOR_RESET);
         return -1;
     }
 
-    printf("Sent interest for object %s to %d interfaces\n", name, sent_count);
+    printf("%sInterest for object '%s' sent to %d interfaces%s\n", 
+           COLOR_YELLOW, name, sent_count, COLOR_RESET);
     return 0;
 }
 
@@ -618,41 +609,84 @@ int cmd_retrieve(char *name)
  */
 int cmd_show_topology()
 {
-    printf("Node: %s:%s\n", node.ip, node.port);
-    printf("External neighbor: %s:%s\n", node.ext_neighbor_ip, node.ext_neighbor_port);
+    printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, COLOR_BLUE, COLOR_RESET);
+    printf("%s%s│               NETWORK TOPOLOGY                     │%s\n", COLOR_BOLD, COLOR_BLUE, COLOR_RESET);
+    printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, COLOR_BLUE, COLOR_RESET);
 
-    if (strlen(node.safe_node_ip) > 0)
+    printf("%s%sNODE IDENTITY:%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    printf("  %-15s: %s%s:%s%s\n", "This Node", COLOR_CYAN, node.ip, node.port, COLOR_RESET);
+
+    if (node.in_network)
     {
-        printf("Safety node: %s:%s", node.safe_node_ip, node.safe_node_port);
+        printf("  %-15s: %s%03d%s\n", "Network ID", COLOR_CYAN, node.network_id, COLOR_RESET);
+    }
+    else
+    {
+        printf("  %-15s: %sNot in a network%s\n", "Network ID", COLOR_RED, COLOR_RESET);
+    }
 
-        /* Mostra se este nó é o seu próprio nó de salvaguarda */
-        if (strcmp(node.safe_node_ip, node.ip) == 0 &&
-            strcmp(node.safe_node_port, node.port) == 0)
+    printf("\n%s%sCONNECTIONS:%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+
+    // External neighbor
+    if (strlen(node.ext_neighbor_ip) > 0)
+    {
+        printf("  %-15s: %s%s:%s%s", "External", COLOR_CYAN, node.ext_neighbor_ip, node.ext_neighbor_port, COLOR_RESET);
+
+        // Check if external neighbor is self
+        if (strcmp(node.ext_neighbor_ip, node.ip) == 0 &&
+            strcmp(node.ext_neighbor_port, node.port) == 0)
         {
-            printf(" (self)");
+            printf(" %s(self - standalone node)%s", COLOR_YELLOW, COLOR_RESET);
         }
         printf("\n");
     }
     else
     {
-        printf("Safety node: Not set\n");
+        printf("  %-15s: %sNone%s\n", "External", COLOR_RED, COLOR_RESET);
     }
 
-    printf("Internal neighbors:\n");
-    Neighbor *curr = node.internal_neighbors;
-    if (curr == NULL)
+    // Safety node
+    if (strlen(node.safe_node_ip) > 0)
     {
-        printf("  None\n");
+        printf("  %-15s: %s%s:%s%s", "Safety", COLOR_CYAN, node.safe_node_ip, node.safe_node_port, COLOR_RESET);
+
+        // Check if safety node is self
+        if (strcmp(node.safe_node_ip, node.ip) == 0 &&
+            strcmp(node.safe_node_port, node.port) == 0)
+        {
+            printf(" %s(self)%s", COLOR_YELLOW, COLOR_RESET);
+        }
+        printf("\n");
     }
     else
     {
+        printf("  %-15s: %sNot set%s\n", "Safety", COLOR_RED, COLOR_RESET);
+    }
+
+    // Internal neighbors
+    printf("\n%s%sINTERNAL NEIGHBORS:%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    Neighbor *curr = node.internal_neighbors;
+
+    if (curr == NULL)
+    {
+        printf("  %sNone%s\n", COLOR_RED, COLOR_RESET);
+    }
+    else
+    {
+        int count = 0;
         while (curr != NULL)
         {
-            printf("  %s:%s (interface: %d)\n", curr->ip, curr->port, curr->interface_id);
+            // Make sure to display both IP and port for each internal neighbor
+            printf("  %s%d.%s %s%s:%s%s (interface: %s%d%s, fd: %d)\n",
+                   COLOR_GREEN, ++count, COLOR_RESET,
+                   COLOR_CYAN, curr->ip, curr->port, COLOR_RESET,
+                   COLOR_YELLOW, curr->interface_id, COLOR_RESET,
+                   curr->fd);
             curr = curr->next;
         }
     }
 
+    printf("\n");
     return 0;
 }
 
@@ -663,22 +697,81 @@ int cmd_show_topology()
  */
 int cmd_show_names()
 {
-    printf("Objects:\n");
-    Object *obj = node.objects;
+    int local_count = 0;
+    int cache_count = 0;
+    Object *obj;
+
+    // Count objects first
+    obj = node.objects;
     while (obj != NULL)
     {
-        printf("  %s\n", obj->name);
+        local_count++;
         obj = obj->next;
     }
 
-    printf("Cache:\n");
     obj = node.cache;
     while (obj != NULL)
     {
-        printf("  %s\n", obj->name);
+        cache_count++;
         obj = obj->next;
     }
 
+    // Print header
+    printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s│               STORED OBJECTS                       │%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+
+    // Print local objects
+    printf("%s%sLOCAL OBJECTS (%d):%s\n", COLOR_BOLD, COLOR_GREEN, local_count, COLOR_RESET);
+    if (local_count == 0)
+    {
+        printf("  No objects stored locally\n");
+    }
+    else
+    {
+        int col = 0;
+        obj = node.objects;
+        while (obj != NULL)
+        {
+            printf("  %s%-24s%s", COLOR_GREEN, obj->name, COLOR_RESET);
+            col++;
+            if (col == 3)
+            {
+                printf("\n");
+                col = 0;
+            }
+            obj = obj->next;
+        }
+        if (col != 0)
+            printf("\n"); // End the line if not already done
+    }
+
+    // Print cache objects
+    printf("\n%s%sCACHED OBJECTS (%d/%d):%s\n", COLOR_BOLD, COLOR_YELLOW, cache_count, node.cache_size, COLOR_RESET);
+    if (cache_count == 0)
+    {
+        printf("  Cache is empty\n");
+    }
+    else
+    {
+        int col = 0;
+        obj = node.cache;
+        while (obj != NULL)
+        {
+            printf("  %s%-24s%s", COLOR_YELLOW, obj->name, COLOR_RESET);
+            col++;
+            if (col == 3)
+            {
+                printf("\n");
+                col = 0;
+            }
+            obj = obj->next;
+        }
+        if (col != 0)
+            printf("\n"); // End the line if not already done
+    }
+
+    printf("\n");
     return 0;
 }
 
@@ -689,33 +782,213 @@ int cmd_show_names()
  */
 int cmd_show_interest_table()
 {
-    printf("Interest table:\n");
     InterestEntry *entry = node.interest_table;
+    int entry_count = 0;
+
+    printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    printf("%s%s│               INTEREST TABLE                       │%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+    printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET);
+
+    if (entry == NULL)
+    {
+        printf("%sNo active interests%s\n\n", COLOR_YELLOW, COLOR_RESET);
+        return 0;
+    }
+
+    // First, collect information about valid interfaces (connected nodes)
+    int valid_interfaces[MAX_INTERFACE] = {0};
+    Neighbor *n;
+
+    // Mark the local interface as valid
+    valid_interfaces[MAX_INTERFACE - 1] = 1; // The local "interface"
+
+    // Mark interfaces corresponding to actual neighbors as valid
+    for (n = node.neighbors; n != NULL; n = n->next)
+    {
+        if (n->interface_id > 0 && n->interface_id < MAX_INTERFACE)
+        {
+            valid_interfaces[n->interface_id] = 1;
+        }
+    }
+
     while (entry != NULL)
     {
-        printf("  %s:", entry->name);
+        entry_count++;
+        printf("%s%sINTEREST:%s \"%s%s%s\"\n",
+               COLOR_BOLD, COLOR_BLUE, COLOR_RESET,
+               COLOR_CYAN, entry->name, COLOR_RESET);
+
+        int response_count = 0;
+        int waiting_count = 0;
+        int closed_count = 0;
+
+        // Count states but only for valid interfaces
         for (int i = 0; i < MAX_INTERFACE; i++)
         {
-            if (entry->interface_states[i] == RESPONSE)
+            if (valid_interfaces[i])
             {
-                printf(" %d:response", i);
-            }
-            else if (entry->interface_states[i] == WAITING)
-            {
-                printf(" %d:waiting", i);
-            }
-            else if (entry->interface_states[i] == CLOSED)
-            {
-                printf(" %d:closed", i);
+                if (entry->interface_states[i] == RESPONSE)
+                    response_count++;
+                else if (entry->interface_states[i] == WAITING)
+                    waiting_count++;
+                else if (entry->interface_states[i] == CLOSED)
+                    closed_count++;
             }
         }
+
+        printf("  %sSummary:%s %s%d response%s, %s%d waiting%s, %s%d closed%s\n",
+               COLOR_BOLD, COLOR_RESET,
+               COLOR_GREEN, response_count, COLOR_RESET,
+               COLOR_YELLOW, waiting_count, COLOR_RESET,
+               COLOR_RED, closed_count, COLOR_RESET);
+
+        // Then list each interface with a state, but only valid ones
+        printf("  %sInterfaces:%s\n", COLOR_BOLD, COLOR_RESET);
+
+        // First RESPONSE interfaces
+        if (response_count > 0)
+        {
+            printf("    %s%sRESPONSE:%s ", COLOR_BOLD, COLOR_GREEN, COLOR_RESET);
+            int first = 1;
+            for (int i = 0; i < MAX_INTERFACE; i++)
+            {
+                // Only show if it's a valid interface and has RESPONSE state
+                if (valid_interfaces[i] && entry->interface_states[i] == RESPONSE)
+                {
+                    if (!first)
+                        printf(", ");
+
+                    if (i == MAX_INTERFACE - 1)
+                    {
+                        printf("%sLOCAL%s", COLOR_CYAN, COLOR_RESET);
+                    }
+                    else
+                    {
+                        // Find neighbor name for this interface
+                        char neighbor_info[50] = "";
+                        for (n = node.neighbors; n != NULL; n = n->next)
+                        {
+                            if (n->interface_id == i)
+                            {
+                                snprintf(neighbor_info, sizeof(neighbor_info), "%s:%s", n->ip, n->port);
+                                break;
+                            }
+                        }
+
+                        if (strlen(neighbor_info) > 0)
+                        {
+                            printf("%s%d%s (%s)", COLOR_GREEN, i, COLOR_RESET, neighbor_info);
+                        }
+                        else
+                        {
+                            printf("%s%d%s", COLOR_GREEN, i, COLOR_RESET);
+                        }
+                    }
+
+                    first = 0;
+                }
+            }
+            printf("\n");
+        }
+
+        // Then WAITING interfaces
+        if (waiting_count > 0)
+        {
+            printf("    %s%sWAITING: %s ", COLOR_BOLD, COLOR_YELLOW, COLOR_RESET);
+            int first = 1;
+            for (int i = 0; i < MAX_INTERFACE; i++)
+            {
+                // Only show if it's a valid interface and has WAITING state
+                if (valid_interfaces[i] && entry->interface_states[i] == WAITING)
+                {
+                    if (!first)
+                        printf(", ");
+
+                    // Find neighbor name for this interface
+                    char neighbor_info[50] = "";
+                    for (n = node.neighbors; n != NULL; n = n->next)
+                    {
+                        if (n->interface_id == i)
+                        {
+                            snprintf(neighbor_info, sizeof(neighbor_info), "%s:%s", n->ip, n->port);
+                            break;
+                        }
+                    }
+
+                    if (strlen(neighbor_info) > 0)
+                    {
+                        printf("%s%d%s (%s)", COLOR_YELLOW, i, COLOR_RESET, neighbor_info);
+                    }
+                    else
+                    {
+                        printf("%s%d%s", COLOR_YELLOW, i, COLOR_RESET);
+                    }
+
+                    first = 0;
+                }
+            }
+            printf("\n");
+        }
+
+        // Then CLOSED interfaces
+        if (closed_count > 0)
+        {
+            printf("    %s%sCLOSED:  %s ", COLOR_BOLD, COLOR_RED, COLOR_RESET);
+            int first = 1;
+            for (int i = 0; i < MAX_INTERFACE; i++)
+            {
+                // Only show if it's a valid interface and has CLOSED state
+                if (valid_interfaces[i] && entry->interface_states[i] == CLOSED)
+                {
+                    if (!first)
+                        printf(", ");
+
+                    // Find neighbor name for this interface
+                    char neighbor_info[50] = "";
+                    for (n = node.neighbors; n != NULL; n = n->next)
+                    {
+                        if (n->interface_id == i)
+                        {
+                            snprintf(neighbor_info, sizeof(neighbor_info), "%s:%s", n->ip, n->port);
+                            break;
+                        }
+                    }
+
+                    if (strlen(neighbor_info) > 0)
+                    {
+                        printf("%s%d%s (%s)", COLOR_RED, i, COLOR_RESET, neighbor_info);
+                    }
+                    else
+                    {
+                        printf("%s%d%s", COLOR_RED, i, COLOR_RESET);
+                    }
+
+                    first = 0;
+                }
+            }
+            printf("\n");
+        }
+
+        // Show age of interest
+        time_t now = time(NULL);
+        int age = (int)difftime(now, entry->timestamp);
+        printf("  %sAge:%s %s%d seconds%s\n",
+               COLOR_BOLD, COLOR_RESET,
+               (age > 5) ? COLOR_YELLOW : COLOR_GREEN, age, COLOR_RESET);
+
         printf("\n");
         entry = entry->next;
     }
 
+    printf("%s%sTotal entries: %d%s\n\n", COLOR_BOLD, COLOR_BLUE, entry_count, COLOR_RESET);
     return 0;
 }
 
+/**
+ * Sair da rede.
+ *
+ * @return 0 em caso de sucesso, -1 em caso de erro
+ */
 /**
  * Sair da rede.
  *
@@ -811,15 +1084,68 @@ int cmd_leave()
     /* Reinicia o estado do nó */
     node.neighbors = NULL;
     node.internal_neighbors = NULL;
-    
+
     /* Reset external neighbor and safety node information when leaving network */
     memset(node.ext_neighbor_ip, 0, INET_ADDRSTRLEN);
     memset(node.ext_neighbor_port, 0, 6);
     memset(node.safe_node_ip, 0, INET_ADDRSTRLEN);
     memset(node.safe_node_port, 0, 6);
-    
+
     node.in_network = 0;
     printf("Left network %03d\n", node.network_id);
+    
+    /* Reinicializa a interface de usuário após sair da rede */
+    printf("\n");
+    printf("%s%s╔══════════════════════════════════════════════════════════════╗%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s        %sRede de Dados Identificados por Nome (NDN)%s            %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_BOLD, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s                  %sVersão 1.0 - 2024/2025%s                      %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_YELLOW, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s╠══════════════════════════════════════════════════════════════╣%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s %sNó não está em nenhuma rede%s                                   %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_RED, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • Endereço IP: %s%-45s%s %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_GREEN, node.ip, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • Porto TCP: %s%-46s%s %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_GREEN, node.port, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s╠══════════════════════════════════════════════════════════════╣%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s %sComandos Principais:%s                                         %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_BOLD, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sj <rede>%s        - Entrar numa rede                         %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sdj <IP> <TCP>%s   - Entrar diretamente numa rede             %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %ssi%s              - Mostrar tabela de interesses             %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %sst%s              - Mostrar topologia                        %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s║%s • %shelp%s            - Mostrar todos os comandos                %s%s║%s\n", 
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET, 
+           COLOR_MAGENTA, COLOR_RESET,
+           COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("%s%s╚══════════════════════════════════════════════════════════════╝%s\n", COLOR_BOLD, COLOR_CYAN, COLOR_RESET);
+    printf("\n");
+    
     return 0;
 }
 
