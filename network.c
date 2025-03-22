@@ -10,24 +10,35 @@
 #include "debug_utils.h"
 #include "commands.h"  /* For cmd_show_interest_table() function */
 
+/**
+ * Enhanced display_interest_table_update with detailed information
+ */
 void display_interest_table_update(const char* action, const char* name) {
-    // Determine color based on action type (errors will be red)
+    // Determine color based on action type
     const char* action_color = COLOR_MAGENTA;
     if (strstr(action, "Not Found") || 
         strstr(action, "Error") || 
         strstr(action, "Failed") || 
         strstr(action, "Removed") || 
-        strstr(action, "Timeout")) {
+        strstr(action, "TIMEOUT") || 
+        strstr(action, "No Entry") ||
+        strstr(action, "All Paths Closed")) {
         action_color = COLOR_RED;
+    } else if (strstr(action, "Found") || 
+               strstr(action, "OBJECT")) {
+        action_color = COLOR_GREEN;
+    } else if (strstr(action, "INTEREST")) {
+        action_color = COLOR_CYAN;
     }
     
     printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, action_color, COLOR_RESET);
-    printf("%s%s│      INTEREST TABLE UPDATE: %-20s      │%s\n", COLOR_BOLD, action_color, action, COLOR_RESET);
+    printf("%s%s│ INTEREST TABLE UPDATE: %-30s │%s\n", COLOR_BOLD, action_color, action, COLOR_RESET);
     printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, action_color, COLOR_RESET);
     
     if (name != NULL) {
         printf("Object: %s%s%s\n\n", COLOR_CYAN, name, COLOR_RESET);
     }
+    cmd_show_interest_table();
 }
 /**
  * Reinicia o interesse para um objeto, removendo a sua entrada.
@@ -945,16 +956,23 @@ int send_noobject_message(int fd, char *name)
  * @param name Nome do objeto pretendido
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
+/**
+ * Enhanced handle_interest_message function with better interface information
+ */
 int handle_interest_message(int fd, char *name)
 {
     /* Obtém o ID de interface para este descritor de ficheiro */
     int interface_id = -1;
     Neighbor *curr = node.neighbors;
+    char neighbor_info[50] = "Unknown";
+    
     while (curr != NULL)
     {
         if (curr->fd == fd)
         {
             interface_id = curr->interface_id;
+            snprintf(neighbor_info, sizeof(neighbor_info), "%s:%s (if:%d)", 
+                    curr->ip, curr->port, curr->interface_id);
             break;
         }
         curr = curr->next;
@@ -962,23 +980,33 @@ int handle_interest_message(int fd, char *name)
 
     if (interface_id < 0)
     {
-        printf("Interface ID not found for fd %d\n", fd);
+        printf("%sInterface ID not found for fd %d%s\n", COLOR_RED, fd, COLOR_RESET);
         return -1;
     }
 
     /* Ignora processamento para ID de interface 0 (ligações de saída) */
     if (interface_id == 0)
     {
-        printf("Ignoring interest from outgoing connection (interface 0)\n");
+        printf("%sIgnoring interest from outgoing connection (interface 0)%s\n", 
+               COLOR_YELLOW, COLOR_RESET);
         return 0;
     }
 
-    printf("Received interest for %s on interface %d\n", name, interface_id);
+    printf("Received interest for %s on interface %d from %s\n", name, interface_id, neighbor_info);
 
     /* Verifica se temos o objeto localmente */
-    if (find_object(name) >= 0 || find_in_cache(name) >= 0)
+    if (find_object(name) >= 0)
     {
-        printf("Found object %s locally, sending back\n", name);
+        printf("%sFound object %s locally in objects list, sending back%s\n", 
+               COLOR_GREEN, name, COLOR_RESET);
+        display_interest_table_update("INTEREST - Object Found Locally", name);
+        return send_object_message(fd, name);
+    }
+    else if (find_in_cache(name) >= 0)
+    {
+        printf("%sFound object %s locally in cache, sending back%s\n", 
+               COLOR_GREEN, name, COLOR_RESET);
+        display_interest_table_update("INTEREST - Object Found In Cache", name);
         return send_object_message(fd, name);
     }
 
@@ -992,7 +1020,13 @@ int handle_interest_message(int fd, char *name)
     /* Marca a interface de origem como RESPONSE */
     entry->interface_states[interface_id] = RESPONSE;
     printf("Marked interface %d as RESPONSE for %s\n", interface_id, name);
-    display_interest_table_update("Interest Received", name);
+    
+    /* Create more informative display message */
+    char detailed_message[100];
+    snprintf(detailed_message, sizeof(detailed_message), 
+            "INTEREST - From %s", neighbor_info);
+            
+    display_interest_table_update(detailed_message, name);
 
     /* Verifica se já estamos a encaminhar este interesse */
     int has_waiting = 0;
@@ -1008,7 +1042,8 @@ int handle_interest_message(int fd, char *name)
     /* Se já estamos a encaminhar este interesse, não encaminhamos novamente */
     if (has_waiting)
     {
-        printf("Already forwarding interest for %s\n", name);
+        printf("%sAlready forwarding interest for %s%s\n", 
+               COLOR_YELLOW, name, COLOR_RESET);
         return 0;
     }
 
@@ -1027,7 +1062,8 @@ int handle_interest_message(int fd, char *name)
             {
                 entry->interface_states[curr->interface_id] = WAITING;
                 forwarded++;
-                printf("Forwarded interest for %s to interface %d\n", name, curr->interface_id);
+                printf("Forwarded interest for %s to interface %d (%s:%s)\n", 
+                       name, curr->interface_id, curr->ip, curr->port);
             }
         }
         curr = curr->next;
@@ -1035,14 +1071,17 @@ int handle_interest_message(int fd, char *name)
 
     if (forwarded == 0)
     {
-        printf("No neighbors to forward interest to, sending NOOBJECT\n");
-        display_interest_table_update("No Object Message",name);
+        printf("%sNo neighbors to forward interest to, sending NOOBJECT%s\n", 
+               COLOR_RED, COLOR_RESET);
         return send_noobject_message(fd, name);
     }
 
     /* Adicionar a chamada para mostrar a tabela de interesses após encaminhar */
     if (forwarded > 0) {
-        display_interest_table_update("Interest Forwarded", name);
+        char forward_msg[100];
+        snprintf(forward_msg, sizeof(forward_msg), 
+                "INTEREST - From %s - Fwd: %d", neighbor_info, forwarded);
+        display_interest_table_update(forward_msg, name);
     }
 
     /* Atualiza o timestamp para iniciar o temporizador de timeout */
@@ -1061,16 +1100,23 @@ int handle_interest_message(int fd, char *name)
 /**
  * Enhanced handle_object_message function with error highlighting
  */
+/**
+ * Enhanced handle_object_message function with better interface information
+ */
 int handle_object_message(int fd, char *name)
 {
     /* Obtém o ID de interface para este descritor de ficheiro */
     int interface_id = -1;
     Neighbor *curr = node.neighbors;
+    char neighbor_info[50] = "Unknown";
+    
     while (curr != NULL)
     {
         if (curr->fd == fd)
         {
             interface_id = curr->interface_id;
+            snprintf(neighbor_info, sizeof(neighbor_info), "%s:%s (if:%d)", 
+                    curr->ip, curr->port, curr->interface_id);
             break;
         }
         curr = curr->next;
@@ -1108,7 +1154,13 @@ int handle_object_message(int fd, char *name)
     if (!entry)
     {
         printf("%sNo interest entry found for %s%s\n", COLOR_RED, name, COLOR_RESET);
-        display_interest_table_update("Object Received - No Interest", name);
+        
+        /* Create more informative display message */
+        char detailed_message[100];
+        snprintf(detailed_message, sizeof(detailed_message), 
+                "OBJECT - No Entry - From %s", neighbor_info);
+                
+        display_interest_table_update(detailed_message, name);
         return 0;
     }
 
@@ -1155,8 +1207,9 @@ int handle_object_message(int fd, char *name)
     }
 
     /* Mostrar a tabela de interesses antes de remover a entrada */
-    char action_msg[50];
-    snprintf(action_msg, sizeof(action_msg), "Object Received - Fwd: %d", forward_count);
+    char action_msg[100];
+    snprintf(action_msg, sizeof(action_msg), 
+            "OBJECT - From %s - Fwd: %d", neighbor_info, forward_count);
     display_interest_table_update(action_msg, name);
 
     /* Remove a entrada de interesse com verificação adicional */
@@ -1186,16 +1239,23 @@ int handle_object_message(int fd, char *name)
 /**
  * Enhanced handle_noobject_message function with error highlighting
  */
+/**
+ * Enhanced handle_noobject_message function with better interface information in display
+ */
 int handle_noobject_message(int fd, char *name)
 {
     /* Obtém o ID de interface para este descritor de ficheiro */
     int interface_id = -1;
     Neighbor *curr = node.neighbors;
+    char neighbor_info[50] = "Unknown";
+    
     while (curr != NULL)
     {
         if (curr->fd == fd)
         {
             interface_id = curr->interface_id;
+            snprintf(neighbor_info, sizeof(neighbor_info), "%s:%s (if:%d)", 
+                    curr->ip, curr->port, curr->interface_id);
             break;
         }
         curr = curr->next;
@@ -1222,14 +1282,26 @@ int handle_noobject_message(int fd, char *name)
     if (!entry)
     {
         printf("%sNo interest entry found for %s%s\n", COLOR_RED, name, COLOR_RESET);
-        display_interest_table_update("NOOBJECT - Entry Not Found", name);
+        
+        /* Create a more informative display message */
+        char detailed_message[100];
+        snprintf(detailed_message, sizeof(detailed_message), 
+                "NOOBJECT - No Entry - From %s", neighbor_info);
+                
+        display_interest_table_update(detailed_message, name);
         return 0;
     }
 
     /* Atualiza a entrada para marcar esta interface como CLOSED */
     entry->interface_states[interface_id] = CLOSED;
     printf("Marked interface %d as CLOSED for %s\n", interface_id, name);
-    display_interest_table_update("No Object Response", name);
+    
+    /* Create a more informative display message */
+    char detailed_message[100];
+    snprintf(detailed_message, sizeof(detailed_message), 
+            "NOOBJECT - From %s", neighbor_info);
+            
+    display_interest_table_update(detailed_message, name);
 
     /* Verifica se há interfaces ainda em estado WAITING */
     int waiting_count = 0;
@@ -1293,7 +1365,7 @@ int handle_noobject_message(int fd, char *name)
         }
 
         /* Mostrar a tabela de interesses antes de remover a entrada */
-        display_interest_table_update("All Paths Closed", name);
+        display_interest_table_update("All Paths Closed - Removing Entry", name);
 
         /* Remove a entrada de interesse */
         remove_interest_entry(name);
@@ -1712,6 +1784,9 @@ int remove_neighbor(int fd)
  * Verifica entradas de interesse que expiraram o tempo limite.
  * Versão melhorada com gestão adequada do ciclo de vida dos interesses.
  */
+/**
+ * Enhanced check_interest_timeouts function with better interface information
+ */
 void check_interest_timeouts()
 {
     time_t current_time = time(NULL);
@@ -1722,23 +1797,40 @@ void check_interest_timeouts()
     {
         if (difftime(current_time, entry->timestamp) > INTEREST_TIMEOUT)
         {
+            int timeout_seconds = (int)difftime(current_time, entry->timestamp);
             printf("%sInterest for %s has timed out (after %d seconds)%s\n", 
-                   COLOR_RED, entry->name, 
-                   (int)difftime(current_time, entry->timestamp),
-                   COLOR_RESET);
-                   
-            display_interest_table_update("Interest Timeout", entry->name);
+                   COLOR_RED, entry->name, timeout_seconds, COLOR_RESET);
+            
+            /* Count waiting interfaces for better reporting */
+            int waiting_count = 0;
+            for (int i = 1; i < MAX_INTERFACE; i++) {
+                if (entry->interface_states[i] == WAITING) {
+                    waiting_count++;
+                }
+            }
+            
+            /* Create more detailed message */
+            char detailed_message[100];
+            snprintf(detailed_message, sizeof(detailed_message), 
+                    "INTEREST TIMEOUT - %d secs - %d waiting ifs", 
+                    timeout_seconds, waiting_count);
+                    
+            display_interest_table_update(detailed_message, entry->name);
 
             /* Envia NOOBJECT para todas as interfaces RESPONSE */
+            int response_count = 0;
             for (int i = 1; i < MAX_INTERFACE; i++)
             { // Começa em 1 para ignorar ligações de saída
                 if (entry->interface_states[i] == RESPONSE)
                 {
+                    response_count++;
                     /* Procura o vizinho com este ID de interface */
                     for (Neighbor *n = node.neighbors; n != NULL; n = n->next)
                     {
                         if (n->interface_id == i)
                         {
+                            printf("Sending NOOBJECT for %s to interface %d (%s:%s)\n", 
+                                   entry->name, i, n->ip, n->port);
                             send_noobject_message(n->fd, entry->name);
                             break;
                         }
