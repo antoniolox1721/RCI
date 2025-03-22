@@ -361,7 +361,7 @@ void cleanup_and_exit()
     /* Se estiver numa rede, sai primeiro */
     if (node.in_network)
     {
-        cmd_leave();
+        cmd_leave_no_UI();
     }
 
     /* Fecha todos os sockets */

@@ -8,7 +8,27 @@
 #include "network.h"
 #include "objects.h"
 #include "debug_utils.h"
+#include "commands.h"  /* For cmd_show_interest_table() function */
 
+void display_interest_table_update(const char* action, const char* name) {
+    // Determine color based on action type (errors will be red)
+    const char* action_color = COLOR_MAGENTA;
+    if (strstr(action, "Not Found") || 
+        strstr(action, "Error") || 
+        strstr(action, "Failed") || 
+        strstr(action, "Removed") || 
+        strstr(action, "Timeout")) {
+        action_color = COLOR_RED;
+    }
+    
+    printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, action_color, COLOR_RESET);
+    printf("%s%s│      INTEREST TABLE UPDATE: %-20s      │%s\n", COLOR_BOLD, action_color, action, COLOR_RESET);
+    printf("%s%s└───────────────────────────────────────────────────┘%s\n", COLOR_BOLD, action_color, COLOR_RESET);
+    
+    if (name != NULL) {
+        printf("Object: %s%s%s\n\n", COLOR_CYAN, name, COLOR_RESET);
+    }
+}
 /**
  * Reinicia o interesse para um objeto, removendo a sua entrada.
  *
@@ -676,6 +696,9 @@ int send_nodes_request(char *net)
  * @param buffer Buffer contendo a resposta NODESLIST
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
+/**
+ * Fixed process_nodeslist_response function to correctly handle standalone nodes
+ */
 int process_nodeslist_response(char *buffer)
 {
     /* Extrai o ID da rede */
@@ -744,7 +767,8 @@ int process_nodeslist_response(char *buffer)
     /* Se não houver nós, cria uma nova rede */
     if (node_count == 0)
     {
-        printf("No valid nodes found in network %s, creating new network as standalone node\n", requested_net);
+        printf("%sNo valid nodes found in network %s, creating new network as standalone node%s\n", 
+               COLOR_GREEN, requested_net, COLOR_RESET);
 
         /* Regista-se na rede */
         if (send_reg_message(requested_net, node.ip, node.port) < 0)
@@ -758,14 +782,15 @@ int process_nodeslist_response(char *buffer)
         node.in_network = 1;
 
         /* Initially, standalone node has no external neighbor */
-        strcpy(node.ext_neighbor_ip, "");
-        strcpy(node.ext_neighbor_port, "");
+        memset(node.ext_neighbor_ip, 0, INET_ADDRSTRLEN);
+        memset(node.ext_neighbor_port, 0, 6);
 
-        /* Initially, safety node is left empty until second node joins */
-        strcpy(node.safe_node_ip, "");
-        strcpy(node.safe_node_port, "");
+        /* Initially, standalone node has no safety node */
+        memset(node.safe_node_ip, 0, INET_ADDRSTRLEN);
+        memset(node.safe_node_port, 0, 6);
 
-        printf("Created and joined network %s as standalone node - waiting for connections\n", requested_net);
+        printf("%sCreated and joined network %s as standalone node - waiting for connections%s\n", 
+               COLOR_GREEN, requested_net, COLOR_RESET);
         return 0;
     }
 
@@ -967,6 +992,7 @@ int handle_interest_message(int fd, char *name)
     /* Marca a interface de origem como RESPONSE */
     entry->interface_states[interface_id] = RESPONSE;
     printf("Marked interface %d as RESPONSE for %s\n", interface_id, name);
+    display_interest_table_update("Interest Received", name);
 
     /* Verifica se já estamos a encaminhar este interesse */
     int has_waiting = 0;
@@ -1010,7 +1036,13 @@ int handle_interest_message(int fd, char *name)
     if (forwarded == 0)
     {
         printf("No neighbors to forward interest to, sending NOOBJECT\n");
+        display_interest_table_update("No Object Message",name);
         return send_noobject_message(fd, name);
+    }
+
+    /* Adicionar a chamada para mostrar a tabela de interesses após encaminhar */
+    if (forwarded > 0) {
+        display_interest_table_update("Interest Forwarded", name);
     }
 
     /* Atualiza o timestamp para iniciar o temporizador de timeout */
@@ -1025,6 +1057,9 @@ int handle_interest_message(int fd, char *name)
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto recebido
  * @return 0 em caso de sucesso, -1 em caso de erro
+ */
+/**
+ * Enhanced handle_object_message function with error highlighting
  */
 int handle_object_message(int fd, char *name)
 {
@@ -1050,11 +1085,13 @@ int handle_object_message(int fd, char *name)
     /* Ignora processamento para ID de interface 0 (ligações de saída) */
     if (interface_id == 0)
     {
-        printf("Ignoring object from outgoing connection (interface 0)\n");
+        printf("%sIgnoring object from outgoing connection (interface 0)%s\n", 
+               COLOR_YELLOW, COLOR_RESET);
         return 0;
     }
 
-    printf("Received object %s from interface %d (fd %d)\n", name, interface_id, fd);
+    printf("%sReceived object %s from interface %d (fd %d)%s\n", 
+           COLOR_GREEN, name, interface_id, fd, COLOR_RESET);
 
     /* Adiciona o objeto à cache */
     if (add_to_cache(name) < 0)
@@ -1063,20 +1100,22 @@ int handle_object_message(int fd, char *name)
     }
     else
     {
-        printf("%sAdded object %s to cache successfully%s\n", COLOR_GREEN, name, COLOR_RESET);
+        printf("%sAdded object %s to cache%s\n", COLOR_GREEN, name, COLOR_RESET);
     }
 
     /* Procura a entrada de interesse */
     InterestEntry *entry = find_interest_entry(name);
     if (!entry)
     {
-        printf("No interest entry found for %s\n", name);
+        printf("%sNo interest entry found for %s%s\n", COLOR_RED, name, COLOR_RESET);
+        display_interest_table_update("Object Received - No Interest", name);
         return 0;
     }
 
     /* Create a temporary array to track which file descriptors we've already forwarded to */
     int forwarded_fds[FD_SETSIZE] = {0};
     forwarded_fds[fd] = 1; /* Mark the source fd as already processed */
+    int forward_count = 0;
 
     /* Encaminha o objeto para todas as interfaces marcadas como RESPONSE */
     for (int i = 1; i < MAX_INTERFACE; i++)
@@ -1091,15 +1130,16 @@ int handle_object_message(int fd, char *name)
                     /* Skip if we've already forwarded to this fd */
                     if (forwarded_fds[n->fd])
                     {
-                        printf("Skipping forwarding of %s to fd %d (already processed)\n",
-                               name, n->fd);
+                        printf("%sSkipping forwarding of %s to fd %d (already processed)%s\n",
+                               COLOR_YELLOW, name, n->fd, COLOR_RESET);
                     }
                     else
                     {
-                        printf("Forwarding object %s to interface %d (fd %d)\n",
-                               name, i, n->fd);
+                        printf("%sForwarding object %s to interface %d (fd %d)%s\n",
+                               COLOR_GREEN, name, i, n->fd, COLOR_RESET);
                         send_object_message(n->fd, name);
                         forwarded_fds[n->fd] = 1; /* Mark as forwarded */
+                        forward_count++;
                     }
                     break;
                 }
@@ -1110,18 +1150,26 @@ int handle_object_message(int fd, char *name)
     /* Verifica se a UI local está à espera deste objeto */
     if (entry->interface_states[MAX_INTERFACE - 1] == RESPONSE)
     {
-        printf("%sObject %s found for local request%s\n", COLOR_GREEN, name, COLOR_RESET);
+        printf("%sObject %s found for local request%s\n", 
+               COLOR_GREEN, name, COLOR_RESET);
     }
+
+    /* Mostrar a tabela de interesses antes de remover a entrada */
+    char action_msg[50];
+    snprintf(action_msg, sizeof(action_msg), "Object Received - Fwd: %d", forward_count);
+    display_interest_table_update(action_msg, name);
 
     /* Remove a entrada de interesse com verificação adicional */
     int remove_result = remove_interest_entry(name);
     if (remove_result < 0)
     {
-        printf("Warning: Interest entry for %s was not found for removal\n", name);
+        printf("%sWarning: Interest entry for %s was not found for removal%s\n", 
+               COLOR_RED, name, COLOR_RESET);
     }
     else
     {
-        printf("Successfully removed interest entry for %s\n", name);
+        printf("%sSuccessfully removed interest entry for %s%s\n", 
+               COLOR_GREEN, name, COLOR_RESET);
     }
 
     return 0;
@@ -1134,6 +1182,9 @@ int handle_object_message(int fd, char *name)
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto não encontrado
  * @return 0 em caso de sucesso, -1 em caso de erro
+ */
+/**
+ * Enhanced handle_noobject_message function with error highlighting
  */
 int handle_noobject_message(int fd, char *name)
 {
@@ -1152,14 +1203,15 @@ int handle_noobject_message(int fd, char *name)
 
     if (interface_id < 0)
     {
-        printf("Interface ID not found for fd %d\n", fd);
+        printf("%sInterface ID not found for fd %d%s\n", COLOR_RED, fd, COLOR_RESET);
         return -1;
     }
 
     /* Ignora processamento para ID de interface 0 (ligações de saída) */
     if (interface_id == 0)
     {
-        printf("Ignoring NOOBJECT from outgoing connection (interface 0)\n");
+        printf("%sIgnoring NOOBJECT from outgoing connection (interface 0)%s\n", 
+               COLOR_YELLOW, COLOR_RESET);
         return 0;
     }
 
@@ -1169,13 +1221,15 @@ int handle_noobject_message(int fd, char *name)
     InterestEntry *entry = find_interest_entry(name);
     if (!entry)
     {
-        printf("No interest entry found for %s\n", name);
+        printf("%sNo interest entry found for %s%s\n", COLOR_RED, name, COLOR_RESET);
+        display_interest_table_update("NOOBJECT - Entry Not Found", name);
         return 0;
     }
 
     /* Atualiza a entrada para marcar esta interface como CLOSED */
     entry->interface_states[interface_id] = CLOSED;
     printf("Marked interface %d as CLOSED for %s\n", interface_id, name);
+    display_interest_table_update("No Object Response", name);
 
     /* Verifica se há interfaces ainda em estado WAITING */
     int waiting_count = 0;
@@ -1202,7 +1256,8 @@ int handle_noobject_message(int fd, char *name)
             {
                 /* Interface inválida - marca como CLOSED */
                 entry->interface_states[i] = CLOSED;
-                printf("Marked invalid interface %d as CLOSED for %s\n", i, name);
+                printf("%sMarked invalid interface %d as CLOSED for %s%s\n", 
+                       COLOR_YELLOW, i, name, COLOR_RESET);
             }
         }
     }
@@ -1210,7 +1265,8 @@ int handle_noobject_message(int fd, char *name)
     if (waiting_count == 0)
     {
         /* Não há interfaces em estado WAITING, envia NOOBJECT para todas as interfaces RESPONSE */
-        printf("No more waiting interfaces for %s, notifying requesters\n", name);
+        printf("%sNo more waiting interfaces for %s, notifying requesters%s\n", 
+               COLOR_RED, name, COLOR_RESET);
 
         /* Notifica todas as interfaces RESPONSE */
         for (int i = 1; i < MAX_INTERFACE; i++)
@@ -1232,8 +1288,12 @@ int handle_noobject_message(int fd, char *name)
         /* Verifica se a UI local está à espera deste objeto */
         if (entry->interface_states[MAX_INTERFACE - 1] == RESPONSE)
         {
-            printf("Object %s not found for local request\n", name);
+            printf("%sObject %s not found for local request%s\n", 
+                   COLOR_RED, name, COLOR_RESET);
         }
+
+        /* Mostrar a tabela de interesses antes de remover a entrada */
+        display_interest_table_update("All Paths Closed", name);
 
         /* Remove a entrada de interesse */
         remove_interest_entry(name);
@@ -1531,7 +1591,8 @@ int remove_neighbor(int fd)
             /* Handle the departure of the node based on the protocol */
             if (is_external)
             {
-                printf("External neighbor %s:%s disconnected\n", removed_ip, removed_port);
+                printf("%sExternal neighbor %s:%s disconnected%s\n", 
+                       COLOR_YELLOW, removed_ip, removed_port, COLOR_RESET);
 
                 /* Check if the safety node was the node that disconnected */
                 int safety_node_disconnected = 0;
@@ -1539,16 +1600,9 @@ int remove_neighbor(int fd)
                     strcmp(node.safe_node_port, removed_port) == 0)
                 {
                     safety_node_disconnected = 1;
-                    printf("WARNING: Safety node has disconnected.\n");
+                    printf("%sWARNING: Safety node has disconnected.%s\n", 
+                           COLOR_RED, COLOR_RESET);
                 }
-
-                /* The protocol says:
-                   1. If the node is not its own salvage, connect to the salvage node
-                   2. If the node is its own salvage and has internal neighbors,
-                      choose one as new external neighbor
-                   3. If the node is its own salvage and has no internal neighbors,
-                      become standalone with no external neighbor
-                */
 
                 /* Check if node is its own salvage */
                 int self_is_safety = (strcmp(node.safe_node_ip, node.ip) == 0 &&
@@ -1557,14 +1611,14 @@ int remove_neighbor(int fd)
                 if (!self_is_safety && !safety_node_disconnected)
                 {
                     /* Not self-salvaged - connect to the salvage node */
-                    printf("Connecting to safety node %s:%s\n",
-                           node.safe_node_ip, node.safe_node_port);
+                    printf("%sConnecting to safety node %s:%s%s\n",
+                           COLOR_GREEN, node.safe_node_ip, node.safe_node_port, COLOR_RESET);
 
                     int new_fd = connect_to_node(node.safe_node_ip, node.safe_node_port);
                     if (new_fd < 0)
                     {
-                        printf("Failed to connect to safety node %s:%s\n",
-                               node.safe_node_ip, node.safe_node_port);
+                        printf("%sFailed to connect to safety node %s:%s%s\n",
+                               COLOR_RED, node.safe_node_ip, node.safe_node_port, COLOR_RESET);
                         return -1;
                     }
 
@@ -1591,8 +1645,10 @@ int remove_neighbor(int fd)
                 else if (node.internal_neighbors != NULL)
                 {
                     /* Self-safety or safety node disconnected, and has internal neighbors */
-                    printf("External neighbor is disconnected, and node has internal neighbors\n");
-                    printf("Choosing new external neighbor from internal neighbors\n");
+                    printf("%sExternal neighbor is disconnected, and node has internal neighbors%s\n",
+                           COLOR_YELLOW, COLOR_RESET);
+                    printf("%sChoosing new external neighbor from internal neighbors%s\n",
+                           COLOR_GREEN, COLOR_RESET);
 
                     /* Choose first internal neighbor as new external neighbor */
                     Neighbor *chosen = node.internal_neighbors;
@@ -1604,10 +1660,11 @@ int remove_neighbor(int fd)
                     /* Always update safety node to self when reconfiguring */
                     strcpy(node.safe_node_ip, node.ip);
                     strcpy(node.safe_node_port, node.port);
-                    printf("Updated safety node to self: %s:%s\n", node.ip, node.port);
+                    printf("%sUpdated safety node to self: %s:%s%s\n", 
+                           COLOR_GREEN, node.ip, node.port, COLOR_RESET);
 
-                    printf("Selected %s:%s as new external neighbor\n",
-                           chosen->ip, chosen->port);
+                    printf("%sSelected %s:%s as new external neighbor%s\n",
+                           COLOR_GREEN, chosen->ip, chosen->port, COLOR_RESET);
 
                     /* Send ENTRY message */
                     char message[MAX_BUFFER];
@@ -1625,18 +1682,19 @@ int remove_neighbor(int fd)
                 else
                 {
                     /* Self-safety with no internal neighbors - last node in network */
-                    printf("Last node remaining in network, becoming standalone\n");
+                    printf("%sLast node remaining in network, becoming standalone%s\n",
+                           COLOR_YELLOW, COLOR_RESET);
 
                     /* Clear external neighbor - ready for new connections */
                     memset(node.ext_neighbor_ip, 0, INET_ADDRSTRLEN);
                     memset(node.ext_neighbor_port, 0, 6);
 
-                    /* Set self as safety node */
-                    strcpy(node.safe_node_ip, node.ip);
-                    strcpy(node.safe_node_port, node.port);
+                    /* Clear safety node for standalone nodes */
+                    memset(node.safe_node_ip, 0, INET_ADDRSTRLEN);
+                    memset(node.safe_node_port, 0, 6);
 
-                    printf("Cleared external neighbor and set self as safety node: %s:%s\n",
-                           node.ip, node.port);
+                    printf("%sCleared external neighbor and safety node - now standalone%s\n",
+                           COLOR_GREEN, COLOR_RESET);
                 }
             }
 
@@ -1664,7 +1722,12 @@ void check_interest_timeouts()
     {
         if (difftime(current_time, entry->timestamp) > INTEREST_TIMEOUT)
         {
-            printf("Interest for %s has timed out\n", entry->name);
+            printf("%sInterest for %s has timed out (after %d seconds)%s\n", 
+                   COLOR_RED, entry->name, 
+                   (int)difftime(current_time, entry->timestamp),
+                   COLOR_RESET);
+                   
+            display_interest_table_update("Interest Timeout", entry->name);
 
             /* Envia NOOBJECT para todas as interfaces RESPONSE */
             for (int i = 1; i < MAX_INTERFACE; i++)
@@ -1686,7 +1749,8 @@ void check_interest_timeouts()
             /* Verifica se a UI local está à espera deste objeto */
             if (entry->interface_states[MAX_INTERFACE - 1] == RESPONSE)
             {
-                printf("Object %s not found for local request (timeout)\n", entry->name);
+                printf("%sObject %s not found for local request (timeout)%s\n", 
+                       COLOR_RED, entry->name, COLOR_RESET);
             }
 
             /* Remove a entrada */

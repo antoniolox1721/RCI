@@ -9,7 +9,7 @@
 #define NETWORK_H
 
 #include "ndn.h"
-
+void display_interest_table_update(const char* action, const char* name);
 /**
  * Protocolo de registo
  */

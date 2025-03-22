@@ -373,12 +373,15 @@ int cmd_join(char *net)
  * @param connect_port TCP port of the node to connect to
  * @return 0 on success, -1 on error
  */
+/**
+ * Fixed cmd_direct_join function to handle standalone node correctly
+ */
 int cmd_direct_join(char *connect_ip, char *connect_port)
 {
     /* Check if already in a network */
     if (node.in_network)
     {
-        printf("%sError: Already in network %03d. Leave first.%s\n", COLOR_RED, node.network_id, COLOR_RESET);
+        printf("Error: Already in network %03d. Leave first.\n", node.network_id);
         return -1;
     }
 
@@ -388,21 +391,22 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     /* Special case - creating a new network (0.0.0.0) */
     if (strcmp(connect_ip, "0.0.0.0") == 0)
     {
-        printf("Creating new network %s as standalone node\n", net);
+        printf("%sCreating new network %s as standalone node%s\n", 
+               COLOR_GREEN, net, COLOR_RESET);
 
         /* Set network ID */
         node.network_id = atoi(net);
         node.in_network = 1;
 
         /* Initially, standalone node has no external neighbor */
-        strcpy(node.ext_neighbor_ip, "");
-        strcpy(node.ext_neighbor_port, "");
+        memset(node.ext_neighbor_ip, 0, INET_ADDRSTRLEN);
+        memset(node.ext_neighbor_port, 0, 6);
 
-        /* Node is its own safety node */
-        strcpy(node.safe_node_ip, node.ip);
-        strcpy(node.safe_node_port, node.port);
+        /* Initially, standalone node has no safety node */
+        memset(node.safe_node_ip, 0, INET_ADDRSTRLEN);
+        memset(node.safe_node_port, 0, 6);
 
-        printf("%sStandalone node created successfully for network %s - waiting for connections%s\n", 
+        printf("%sStandalone node created for network %s - waiting for connections%s\n", 
                COLOR_GREEN, net, COLOR_RESET);
         return 0;
     }
@@ -414,7 +418,7 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     int fd = connect_to_node(connect_ip, connect_port);
     if (fd < 0)
     {
-        printf("%sFailed to connect to %s:%s%s\n", COLOR_RED, connect_ip, connect_port, COLOR_RESET);
+        printf("Failed to connect to %s:%s\n", connect_ip, connect_port);
         return -1;
     }
 
@@ -428,7 +432,7 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     /* Send ENTRY message */
     if (send_entry_message(fd, node.ip, node.port) < 0)
     {
-        printf("%sFailed to send ENTRY message.%s\n", COLOR_RED, COLOR_RESET);
+        printf("Failed to send ENTRY message.\n");
         close(fd);
         return -1;
     }
@@ -437,8 +441,7 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
     node.network_id = atoi(net);
     node.in_network = 1;
 
-    printf("%sSuccessfully joined network %s through %s:%s%s\n", 
-           COLOR_GREEN, net, connect_ip, connect_port, COLOR_RESET);
+    printf("Joined network %s through %s:%s\n", net, connect_ip, connect_port);
     return 0;
 }
 
@@ -607,6 +610,9 @@ int cmd_retrieve(char *name)
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
+/**
+ * Enhanced cmd_show_topology to better handle standalone node display
+ */
 int cmd_show_topology()
 {
     printf("\n%s%s┌───────────────────────────────────────────────────┐%s\n", COLOR_BOLD, COLOR_BLUE, COLOR_RESET);
@@ -642,7 +648,8 @@ int cmd_show_topology()
     }
     else
     {
-        printf("  %-15s: %sNone%s\n", "External", COLOR_RED, COLOR_RESET);
+        printf("  %-15s: %sNone%s %s(standalone node)%s\n", 
+               "External", COLOR_YELLOW, COLOR_RESET, COLOR_YELLOW, COLOR_RESET);
     }
 
     // Safety node
@@ -660,7 +667,18 @@ int cmd_show_topology()
     }
     else
     {
-        printf("  %-15s: %sNot set%s\n", "Safety", COLOR_RED, COLOR_RESET);
+        // For standalone node, it's normal not to have safety node
+        if (strlen(node.ext_neighbor_ip) == 0 || 
+            (strcmp(node.ext_neighbor_ip, node.ip) == 0 && 
+             strcmp(node.ext_neighbor_port, node.port) == 0))
+        {
+            printf("  %-15s: %sNone%s %s(standalone node)%s\n", 
+                   "Safety", COLOR_YELLOW, COLOR_RESET, COLOR_YELLOW, COLOR_RESET);
+        }
+        else
+        {
+            printf("  %-15s: %sNot set%s\n", "Safety", COLOR_RED, COLOR_RESET);
+        }
     }
 
     // Internal neighbors
@@ -669,7 +687,7 @@ int cmd_show_topology()
 
     if (curr == NULL)
     {
-        printf("  %sNone%s\n", COLOR_RED, COLOR_RESET);
+        printf("  %sNone%s\n", COLOR_YELLOW, COLOR_RESET);
     }
     else
     {
@@ -1149,6 +1167,107 @@ int cmd_leave()
     return 0;
 }
 
+int cmd_leave_no_UI()
+{
+    if (!node.in_network)
+    {
+        printf("Not in a network.\n");
+        return -1;
+    }
+
+    /* Cancela o registo na rede */
+    char net_str[4];
+    snprintf(net_str, 4, "%03d", node.network_id);
+
+    /* Faz cópias locais dos vizinhos antes de cancelar o registo */
+    Neighbor *neighbor_copy = NULL;
+    Neighbor *curr = node.neighbors;
+
+    while (curr != NULL)
+    {
+        Neighbor *next = curr->next;
+        Neighbor *new_copy = malloc(sizeof(Neighbor));
+        if (new_copy != NULL)
+        {
+            memcpy(new_copy, curr, sizeof(Neighbor));
+            new_copy->next = neighbor_copy;
+            neighbor_copy = new_copy;
+        }
+        curr = next;
+    }
+
+    /* Envia mensagem de cancelamento de registo ao servidor */
+    if (send_unreg_message(net_str, node.ip, node.port) < 0)
+    {
+        printf("Failed to unregister from the network.\n");
+
+        /* Liberta as cópias já que não as usámos */
+        while (neighbor_copy != NULL)
+        {
+            Neighbor *next = neighbor_copy->next;
+            free(neighbor_copy);
+            neighbor_copy = next;
+        }
+
+        return -1;
+    }
+
+    /* Fecha todas as ligações de vizinhos com segurança */
+    while (neighbor_copy != NULL)
+    {
+        Neighbor *next = neighbor_copy->next;
+
+        /* Encontra o vizinho real na lista */
+        Neighbor *actual_neighbor = node.neighbors;
+        while (actual_neighbor != NULL)
+        {
+            if (actual_neighbor->fd == neighbor_copy->fd)
+            {
+                /* Fecha o socket com verificação de erros */
+                if (close(neighbor_copy->fd) < 0)
+                {
+                    perror("close");
+                }
+                break;
+            }
+            actual_neighbor = actual_neighbor->next;
+        }
+
+        free(neighbor_copy);
+        neighbor_copy = next;
+    }
+
+    /* Agora limpa com segurança as listas de vizinhos */
+    curr = node.neighbors;
+    while (curr != NULL)
+    {
+        Neighbor *next = curr->next;
+        free(curr);
+        curr = next;
+    }
+
+    curr = node.internal_neighbors;
+    while (curr != NULL)
+    {
+        Neighbor *next = curr->next;
+        free(curr);
+        curr = next;
+    }
+
+    /* Reinicia o estado do nó */
+    node.neighbors = NULL;
+    node.internal_neighbors = NULL;
+
+    /* Reset external neighbor and safety node information when leaving network */
+    memset(node.ext_neighbor_ip, 0, INET_ADDRSTRLEN);
+    memset(node.ext_neighbor_port, 0, 6);
+    memset(node.safe_node_ip, 0, INET_ADDRSTRLEN);
+    memset(node.safe_node_port, 0, 6);
+
+    node.in_network = 0;
+    printf("Left network %03d\n", node.network_id);
+    return 0;
+}
 /**
  * Sair da aplicação.
  *
@@ -1159,7 +1278,7 @@ int cmd_exit()
     /* Se estiver numa rede, sai primeiro */
     if (node.in_network)
     {
-        cmd_leave();
+        cmd_leave_no_UI();
     }
 
     /* Limpa recursos e sai */

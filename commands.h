@@ -84,6 +84,8 @@ int cmd_show_interest_table();
  */
 int cmd_leave();
 
+int cmd_leave_no_UI();
+
 /**
  * Processa o comando "exit" (x) para sair da aplicação.
  * 

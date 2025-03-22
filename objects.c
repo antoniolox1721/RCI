@@ -7,6 +7,8 @@
 
 #include "objects.h"
 #include "debug_utils.h"
+#include "network.h"
+
 
 /**
  * Adiciona um objeto.
@@ -260,7 +262,7 @@ int add_interest_entry(char *name, int interface_id, enum interface_state state)
     
     printf("Added interest entry for %s with interface %d in state %d\n", 
            name, interface_id, state);
-    
+    display_interest_table_update("Entry Added", name);
     return 0;
 }
 
@@ -272,13 +274,16 @@ int add_interest_entry(char *name, int interface_id, enum interface_state state)
  * @param state Novo estado para a interface (RESPONSE, WAITING ou CLOSED)
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
+
 int update_interest_entry(char *name, int interface_id, enum interface_state state) {
     /* Procura a entrada */
     InterestEntry *entry = find_interest_entry(name);
     
     if (entry != NULL) {
         if (entry->marked_for_removal) {
-            printf("WARNING: Updating interest entry for %s that is marked for removal\n", name);
+            printf("%sWARNING: Updating interest entry for %s that is marked for removal%s\n", 
+                  COLOR_RED, name, COLOR_RESET);
+            display_interest_table_update("Update Error", name);
             return -1;
         }
         
@@ -290,10 +295,16 @@ int update_interest_entry(char *name, int interface_id, enum interface_state sta
                name, interface_id, 
                state_to_string(old_state), 
                state_to_string(state));
+        
+        /* Display updated interest table */
+        display_interest_table_update("State Updated", name);
+        
         return 0;
     }
     
     /* Entrada não encontrada, cria-a */
+    printf("%sInterest entry for %s not found, creating new entry%s\n", 
+          COLOR_YELLOW, name, COLOR_RESET);
     return add_interest_entry(name, interface_id, state);
 }
 
@@ -319,13 +330,14 @@ int remove_interest_entry(char *name) {
             
             free(curr);
             printf("Removed interest entry for %s\n", name);
+            display_interest_table_update("Entry Removed", name);
             return 0;
         }
         
         prev = curr;
         curr = curr->next;
     }
-    
+    display_interest_table_update("Entry Removed", name);
     return -1;  /* Entrada não encontrada */
 }
 
