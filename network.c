@@ -1043,7 +1043,7 @@ int handle_object_message(int fd, char *name)
 
     if (interface_id < 0)
     {
-        printf("Interface ID not found for fd %d\n", fd);
+        printf("%sInterface ID not found for fd %d%s\n", COLOR_RED, fd, COLOR_RESET);
         return -1;
     }
 
@@ -1059,11 +1059,11 @@ int handle_object_message(int fd, char *name)
     /* Adiciona o objeto à cache */
     if (add_to_cache(name) < 0)
     {
-        printf("Failed to add object %s to cache\n", name);
+        printf("%sFailed to add object %s to cache%s\n", COLOR_RED, name, COLOR_RESET);
     }
     else
     {
-        printf("Added object %s to cache\n", name);
+        printf("%sAdded object %s to cache successfully%s\n", COLOR_GREEN, name, COLOR_RESET);
     }
 
     /* Procura a entrada de interesse */
@@ -1110,7 +1110,7 @@ int handle_object_message(int fd, char *name)
     /* Verifica se a UI local está à espera deste objeto */
     if (entry->interface_states[MAX_INTERFACE - 1] == RESPONSE)
     {
-        printf("Object %s found for local request\n", name);
+        printf("%sObject %s found for local request%s\n", COLOR_GREEN, name, COLOR_RESET);
     }
 
     /* Remove a entrada de interesse com verificação adicional */
