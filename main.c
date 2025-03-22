@@ -1,8 +1,29 @@
-/*
- * Implementação de Rede de Dados Identificados por Nome (NDN)
- * Redes de Computadores e Internet - 2024/2025
+/**
+ * @file main.c
+ * @brief Implementação de Rede de Dados Identificados por Nome (NDN)
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
  *
- * main.c - Ficheiro principal do programa
+ * Este ficheiro contém a função principal e o ciclo de execução para a implementação
+ * de uma Rede de Dados Identificados por Nome (NDN) para a unidade curricular de 
+ * Redes de Computadores e Internet (2024/2025).
+ *
+ * O programa implementa um nó que pode participar numa rede NDN, onde os objetos 
+ * são identificados por nomes únicos e a topologia da rede é mantida como uma 
+ * árvore. O sistema suporta os seguintes protocolos:
+ *
+ * 1. Protocolo de Registo (UDP):
+ *    - NODES/NODESLIST: Para descoberta de nós
+ *    - REG/UNREG: Para registo/cancelamento de registo
+ *
+ * 2. Protocolo de Topologia (TCP):
+ *    - ENTRY: Para informar da entrada na rede
+ *    - SAFE: Para fornecer informação sobre nós de salvaguarda
+ *
+ * 3. Protocolo NDN (TCP):
+ *    - INTEREST: Para solicitar objetos por nome
+ *    - OBJECT: Para responder com objetos solicitados
+ *    - NOOBJECT: Para indicar que um objeto não foi encontrado
  */
 
 #include "ndn.h"
@@ -11,12 +32,15 @@
 #include "objects.h"
 
 /**
- * Variável global que representa o estado do nó
+ * @brief Variável global que representa o estado do nó
  */
 Node node;
 
 /**
- * Função principal.
+ * @brief Função principal.
+ * 
+ * Inicializa o nó, configura os manipuladores de sinais, e entra no ciclo principal
+ * para processar eventos de entrada do utilizador e eventos de rede.
  * 
  * @param argc Número de argumentos da linha de comandos
  * @param argv Array de strings com os argumentos da linha de comandos
@@ -124,7 +148,10 @@ int main(int argc, char *argv[])
 }
 
 /**
- * Manipulador de sinal para SIGINT (Ctrl+C).
+ * @brief Manipulador de sinal para SIGINT (Ctrl+C).
+ * 
+ * Esta função é chamada quando o utilizador prime Ctrl+C. Ela limpa os recursos
+ * e termina o programa de forma graciosa.
  * 
  * @param sig Número do sinal recebido
  */
@@ -139,7 +166,9 @@ void handle_sigint(int sig)
 }
 
 /**
- * Trata a entrada do utilizador através da linha de comandos.
+ * @brief Trata a entrada do utilizador através da linha de comandos.
+ * 
+ * Lê um comando do stdin e passa-o ao processador de comandos.
  */
 void handle_user_input()
 {
@@ -176,22 +205,17 @@ void handle_user_input()
 }
 
 /**
- * Inicializa o nó.
+ * @brief Inicializa o nó.
+ * 
+ * Cria os sockets necessários, configura os endereços e portos, e prepara
+ * o nó para participar na rede NDN. Também apresenta uma interface de utilizador
+ * formatada com informações sobre o nó.
  * 
  * @param cache_size Tamanho máximo da cache
  * @param ip Endereço IP do nó
  * @param port Porto TCP do nó
  * @param reg_ip Endereço IP do servidor de registo
  * @param reg_udp Porto UDP do servidor de registo
- */
-/**
- * Initialize the node with colorful user interface.
- * 
- * @param cache_size Maximum cache size
- * @param ip Node IP address
- * @param port Node TCP port
- * @param reg_ip Registration server IP
- * @param reg_udp Registration server UDP port
  */
 void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg_udp) {
     struct addrinfo hints, *res;
@@ -353,8 +377,10 @@ void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg
 }
 
 /**
- * Limpa recursos e sai do programa.
- * Fecha todos os sockets e liberta a memória alocada.
+ * @brief Limpa recursos e sai do programa.
+ * 
+ * Fecha todos os sockets, liberta a memória alocada para objetos, cache, 
+ * tabela de interesses e vizinhos.
  */
 void cleanup_and_exit()
 {

@@ -1,8 +1,18 @@
-/*
- * Implementação de Rede de Dados Identificados por Nome (NDN)
- * Redes de Computadores e Internet - 2024/2025
+/**
+ * @file commands.c
+ * @brief Implementação das funções de comandos do utilizador
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
  *
- * commands.c - Implementação das funções de comandos
+ * Este ficheiro contém a implementação das funções para processar comandos
+ * introduzidos pelo utilizador na interface da aplicação NDN. Os comandos
+ * suportados permitem:
+ *
+ * - Gestão da rede: join, direct_join, leave, exit
+ * - Gestão de objetos: create, delete, retrieve
+ * - Visualização de informações: show_topology, show_names, show_interest_table
+ *
+ * PARTE 1: Inclui as funções process_command, print_help, cmd_join e cmd_direct_join
  */
 
 #include "commands.h"
@@ -10,8 +20,12 @@
 #include "objects.h"
 #include "debug_utils.h"
 #include "ndn.h"
+
 /**
- * Processa um comando do utilizador.
+ * @brief Processa um comando do utilizador.
+ *
+ * Analisa o comando introduzido pelo utilizador, identifica o comando
+ * e os seus parâmetros, e invoca a função correspondente.
  *
  * @param cmd String contendo o comando a processar
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -21,39 +35,39 @@ int process_command(char *cmd) {
     strncpy(original_cmd, cmd, MAX_CMD_SIZE - 1);
     original_cmd[MAX_CMD_SIZE - 1] = '\0';
 
-    /* Skip leading whitespace */
+    /* Ignora espaços no início */
     while (*cmd && isspace(*cmd)) {
         cmd++;
     }
 
     if (*cmd == '\0') {
-        return 0; /* Empty command */
+        return 0; /* Comando vazio */
     }
 
-    /* Extract command name (first word) */
+    /* Extrai o nome do comando (primeira palavra) */
     char cmd_name[MAX_CMD_SIZE];
     int i = 0;
     while (cmd[i] && !isspace(cmd[i]) && i < MAX_CMD_SIZE - 1) {
-        cmd_name[i] = tolower(cmd[i]); /* Convert to lowercase */
+        cmd_name[i] = tolower(cmd[i]); /* Converte para minúsculas */
         i++;
     }
     cmd_name[i] = '\0';
 
-    /* Advance to parameters (after the command and spaces) */
+    /* Avança para os parâmetros (depois do comando e espaços) */
     char *params = cmd + i;
     while (*params && isspace(*params)) {
         params++;
     }
 
-    /* Check for commands that need special handling for multi-word arguments */
+    /* Verifica comandos que precisam de tratamento especial para argumentos multi-palavra */
     if (strcmp(cmd_name, "retrieve") == 0 || strcmp(cmd_name, "r") == 0 ||
         strcmp(cmd_name, "create") == 0 || strcmp(cmd_name, "c") == 0 ||
         strcmp(cmd_name, "delete") == 0 || strcmp(cmd_name, "dl") == 0) {
         
-        /* For these commands, we need to ensure the arguments don't contain spaces */
+        /* Para estes comandos, precisamos garantir que os argumentos não contenham espaços */
         char object_name[MAX_OBJECT_NAME + 1] = {0};
         
-        /* Extract the first word as the object name */
+        /* Extrai a primeira palavra como o nome do objeto */
         i = 0;
         while (params[i] && !isspace(params[i]) && i < MAX_OBJECT_NAME) {
             object_name[i] = params[i];
@@ -61,20 +75,20 @@ int process_command(char *cmd) {
         }
         object_name[i] = '\0';
         
-        /* Check if there are more words after the object name */
+        /* Verifica se há mais palavras após o nome do objeto */
         char *next_param = params + i;
         while (*next_param && isspace(*next_param)) {
             next_param++;
         }
         
-        /* If there are more words, display an error */
+        /* Se houver mais palavras, mostra um erro */
         if (*next_param) {
             printf("%sError: Object name cannot contain spaces. Found: \"%s %s\"%s\n", 
                    COLOR_RED, object_name, next_param, COLOR_RESET);
             return -1;
         }
         
-        /* Process the command with the validated object name */
+        /* Processa o comando com o nome do objeto validado */
         if (strcmp(cmd_name, "retrieve") == 0 || strcmp(cmd_name, "r") == 0) {
             if (*object_name) {
                 return cmd_retrieve(object_name);
@@ -99,9 +113,9 @@ int process_command(char *cmd) {
         }
     }
 
-    /* Handle other commands using strtok for parsing */
+    /* Processa outros comandos usando strtok para análise */
     char *token = strtok(cmd, " \n");
-    /* Skip the command name token, already processed above */
+    /* Ignora o token do nome do comando, já processado acima */
     token = strtok(NULL, " \n");
 
     if (strcmp(cmd_name, "join") == 0 || strcmp(cmd_name, "j") == 0) {
@@ -112,8 +126,8 @@ int process_command(char *cmd) {
             return -1;
         }
     } else if (strcmp(cmd_name, "direct") == 0 || strcmp(cmd_name, "dj") == 0) {
-        char *connect_ip = token;                /* First token after command is IP */
-        char *connect_tcp = strtok(NULL, " \n"); /* Second token is TCP port */
+        char *connect_ip = token;                /* Primeiro token após o comando é o IP */
+        char *connect_tcp = strtok(NULL, " \n"); /* Segundo token é o porto TCP */
 
         if (connect_ip != NULL && connect_tcp != NULL) {
             return cmd_direct_join(connect_ip, connect_tcp);
@@ -127,7 +141,7 @@ int process_command(char *cmd) {
             strncpy(what, token, MAX_CMD_SIZE - 1);
             what[MAX_CMD_SIZE - 1] = '\0';
 
-            /* Convert to lowercase */
+            /* Converte para minúsculas */
             for (int i = 0; what[i]; i++) {
                 what[i] = tolower(what[i]);
             }
@@ -147,7 +161,7 @@ int process_command(char *cmd) {
             return -1;
         }
     }
-    /* Handle direct abbreviations */
+    /* Processa abreviaturas diretas */
     else if (strcmp(cmd_name, "st") == 0) {
         return cmd_show_topology();
     } else if (strcmp(cmd_name, "sn") == 0) {
@@ -170,7 +184,8 @@ int process_command(char *cmd) {
 }
 
 /**
- * Imprime informações de ajuda.
+ * @brief Imprime informações de ajuda.
+ * 
  * Mostra todos os comandos disponíveis e suas descrições.
  */
 void print_help()
@@ -190,8 +205,10 @@ void print_help()
 }
 
 /**
- * Aderir a uma rede através do servidor de registo.
- * Modificado para validar corretamente o ID da rede e processar a resposta.
+ * @brief Aderir a uma rede através do servidor de registo.
+ * 
+ * Envia um pedido NODES ao servidor de registo, recebe a lista de nós,
+ * escolhe um nó aleatoriamente e liga-se a ele. Em seguida, regista-se na rede.
  *
  * @param net ID da rede (três dígitos)
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -281,128 +298,44 @@ int cmd_join(char *net)
            COLOR_GREEN, net, COLOR_RESET);
     return 0;
 }
-// /**
-//  * Directly join a network or create a new one without registering with the server.
-//  *
-//  * @param connect_ip IP address of the node to connect to, or 0.0.0.0 to create a new network
-//  * @param connect_port TCP port of the node to connect to
-//  * @return 0 on success, -1 on error
-//  */
-// int cmd_direct_join(char *connect_ip, char *connect_port)
-// {
-//     /* Check if already in a network */
-//     if (node.in_network)
-//     {
-//         printf("Error: Already in network %03d. Leave first.\n", node.network_id);
-//         return -1;
-//     }
 
-//     /* Use a default network ID (076) */
-//     char net[4] = "076";
-
-//     /* Special case - creating a new network (0.0.0.0) */
-//     if (strcmp(connect_ip, "0.0.0.0") == 0)
-//     {
-//         printf("Creating new network %s as standalone node\n", net);
-
-//         /* Register with the registration server for this new network */
-//         if (send_reg_message(net, node.ip, node.port) < 0)
-//         {
-//             printf("Warning: Failed to register with the registration server.\n");
-//             printf("Other nodes won't be able to discover this network via the join command.\n");
-//             /* Continue anyway since this is direct join */
-//         }
-//         else
-//         {
-//             printf("Successfully registered with the registration server for network %s\n", net);
-//         }
-
-//         /* Set network ID */
-//         node.network_id = atoi(net);
-//         node.in_network = 1;
-
-//         /* Initially, standalone node has no external neighbor */
-//         strcpy(node.ext_neighbor_ip, "");
-//         strcpy(node.ext_neighbor_port, "");
-
-//         /* Node is its own safety node */
-//         strcpy(node.safe_node_ip, node.ip);
-//         strcpy(node.safe_node_port, node.port);
-
-//         printf("Standalone node created for network %s - waiting for connections\n", net);
-//         return 0;
-//     }
-
-//     /* Regular connection to an existing node */
-//     printf("Connecting to node %s:%s in network %s\n", connect_ip, connect_port, net);
-
-//     /* Connect to the specified node */
-//     int fd = connect_to_node(connect_ip, connect_port);
-//     if (fd < 0)
-//     {
-//         printf("Failed to connect to %s:%s\n", connect_ip, connect_port);
-//         return -1;
-//     }
-
-//     /* Set as external neighbor */
-//     strcpy(node.ext_neighbor_ip, connect_ip);
-//     strcpy(node.ext_neighbor_port, connect_port);
-
-//     /* Add as external neighbor */
-//     add_neighbor(connect_ip, connect_port, fd, 1);
-
-//     /* Send ENTRY message */
-//     if (send_entry_message(fd, node.ip, node.port) < 0)
-//     {
-//         printf("Failed to send ENTRY message.\n");
-//         close(fd);
-//         return -1;
-//     }
-
-//     /* Set network ID */
-//     node.network_id = atoi(net);
-//     node.in_network = 1;
-
-//     printf("Joined network %s through %s:%s\n", net, connect_ip, connect_port);
-//     return 0;
-// }
 /**
- * Directly join a network or create a new one without registering with the server.
+ * @brief Aderir diretamente a uma rede sem usar o servidor de registo.
+ * 
+ * Cria uma rede isolada se connect_ip for 0.0.0.0, ou liga-se
+ * diretamente ao nó especificado.
  *
- * @param connect_ip IP address of the node to connect to, or 0.0.0.0 to create a new network
- * @param connect_port TCP port of the node to connect to
- * @return 0 on success, -1 on error
- */
-/**
- * Fixed cmd_direct_join function to handle standalone node correctly
+ * @param connect_ip Endereço IP do nó a ligar, ou 0.0.0.0 para criar uma nova rede
+ * @param connect_port Porto TCP do nó a ligar
+ * @return 0 em caso de sucesso, -1 em caso de erro
  */
 int cmd_direct_join(char *connect_ip, char *connect_port)
 {
-    /* Check if already in a network */
+    /* Verifica se já está numa rede */
     if (node.in_network)
     {
         printf("Error: Already in network %03d. Leave first.\n", node.network_id);
         return -1;
     }
 
-    /* Use a default network ID (076) */
+    /* Usa um ID de rede por omissão (076) */
     char net[4] = "076";
 
-    /* Special case - creating a new network (0.0.0.0) */
+    /* Caso especial - criar uma nova rede (0.0.0.0) */
     if (strcmp(connect_ip, "0.0.0.0") == 0)
     {
         printf("%sCreating new network %s as standalone node%s\n", 
                COLOR_GREEN, net, COLOR_RESET);
 
-        /* Set network ID */
+        /* Define o ID da rede */
         node.network_id = atoi(net);
         node.in_network = 1;
 
-        /* Initially, standalone node has no external neighbor */
+        /* Inicialmente, um nó isolado não tem vizinho externo */
         memset(node.ext_neighbor_ip, 0, INET_ADDRSTRLEN);
         memset(node.ext_neighbor_port, 0, 6);
 
-        /* Initially, standalone node has no safety node */
+        /* Inicialmente, um nó isolado não tem nó de salvaguarda */
         memset(node.safe_node_ip, 0, INET_ADDRSTRLEN);
         memset(node.safe_node_port, 0, 6);
 
@@ -411,10 +344,10 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
         return 0;
     }
 
-    /* Regular connection to an existing node */
+    /* Ligação normal a um nó existente */
     printf("Connecting to node %s:%s in network %s\n", connect_ip, connect_port, net);
 
-    /* Connect to the specified node */
+    /* Liga-se ao nó especificado */
     int fd = connect_to_node(connect_ip, connect_port);
     if (fd < 0)
     {
@@ -422,14 +355,14 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
         return -1;
     }
 
-    /* Set as external neighbor */
+    /* Define como vizinho externo */
     strcpy(node.ext_neighbor_ip, connect_ip);
     strcpy(node.ext_neighbor_port, connect_port);
 
-    /* Add as external neighbor */
+    /* Adiciona como vizinho externo */
     add_neighbor(connect_ip, connect_port, fd, 1);
 
-    /* Send ENTRY message */
+    /* Envia mensagem ENTRY */
     if (send_entry_message(fd, node.ip, node.port) < 0)
     {
         printf("Failed to send ENTRY message.\n");
@@ -437,16 +370,30 @@ int cmd_direct_join(char *connect_ip, char *connect_port)
         return -1;
     }
 
-    /* Set network ID */
+    /* Define o ID da rede */
     node.network_id = atoi(net);
     node.in_network = 1;
 
     printf("Joined network %s through %s:%s\n", net, connect_ip, connect_port);
     return 0;
 }
+/**
+ * @file commands.c
+ * @brief Implementação das funções de comandos do utilizador (continuação)
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
+ *
+ * Este ficheiro contém a implementação das funções para processar comandos
+ * introduzidos pelo utilizador na interface da aplicação NDN.
+ *
+ * PARTE 2: Inclui as funções cmd_create, cmd_delete, cmd_retrieve e cmd_show_topology
+ */
 
 /**
- * Criar um objeto.
+ * @brief Criar um objeto.
+ *
+ * Adiciona um novo objeto à lista de objetos locais do nó.
+ * Verifica se o nome do objeto é válido antes de o criar.
  *
  * @param name Nome do objeto a criar
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -478,7 +425,10 @@ int cmd_create(char *name)
 }
 
 /**
- * Eliminar um objeto.
+ * @brief Eliminar um objeto.
+ *
+ * Remove um objeto da lista de objetos locais do nó.
+ * Verifica se o nome do objeto é válido e se o objeto existe.
  *
  * @param name Nome do objeto a eliminar
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -503,8 +453,10 @@ int cmd_delete(char *name)
 }
 
 /**
- * Obter um objeto.
- * Procura localmente e, se não encontrar, envia interesse pela rede.
+ * @brief Obter um objeto.
+ * 
+ * Procura um objeto localmente (tanto na lista de objetos como na cache)
+ * e, se não encontrar, envia uma mensagem de interesse pela rede.
  *
  * @param name Nome do objeto a obter
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -517,7 +469,7 @@ int cmd_retrieve(char *name)
         return -1;
     }
 
-    /* Check for spaces in name */
+    /* Verifica se há espaços no nome */
     if (strchr(name, ' ') != NULL)
     {
         printf("%sError: Object name cannot contain spaces%s\n", COLOR_RED, COLOR_RESET);
@@ -606,12 +558,12 @@ int cmd_retrieve(char *name)
 }
 
 /**
- * Mostrar a topologia da rede.
+ * @brief Mostrar a topologia da rede.
+ *
+ * Apresenta informações sobre o nó, o seu vizinho externo, o nó de salvaguarda
+ * e todos os vizinhos internos.
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
- */
-/**
- * Enhanced cmd_show_topology to better handle standalone node display
  */
 int cmd_show_topology()
 {
@@ -709,7 +661,22 @@ int cmd_show_topology()
 }
 
 /**
- * Mostrar nomes de objetos armazenados.
+ * @file commands.c
+ * @brief Implementação das funções de comandos do utilizador (continuação)
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
+ *
+ * Este ficheiro contém a implementação das funções para processar comandos
+ * introduzidos pelo utilizador na interface da aplicação NDN.
+ *
+ * PARTE 3: Inclui as funções cmd_show_names, cmd_show_interest_table, cmd_leave, cmd_leave_no_UI e cmd_exit
+ */
+
+/**
+ * @brief Mostrar nomes de objetos armazenados.
+ *
+ * Lista todos os objetos locais e em cache armazenados no nó.
+ * Apresenta informações de forma organizada com contagens e formatação.
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
@@ -794,7 +761,11 @@ int cmd_show_names()
 }
 
 /**
- * Mostrar a tabela de interesses.
+ * @brief Mostrar a tabela de interesses.
+ *
+ * Apresenta informações detalhadas sobre todos os interesses pendentes,
+ * incluindo o nome do objeto, interfaces marcadas como RESPONSE, WAITING ou CLOSED,
+ * e a idade do interesse.
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
@@ -1003,12 +974,10 @@ int cmd_show_interest_table()
 }
 
 /**
- * Sair da rede.
+ * @brief Sair da rede.
  *
- * @return 0 em caso de sucesso, -1 em caso de erro
- */
-/**
- * Sair da rede.
+ * Cancela o registo do nó no servidor de registo e fecha todas as ligações
+ * de vizinhos. Atualiza a interface de utilizador para mostrar o estado fora da rede.
  *
  * @return 0 em caso de sucesso, -1 em caso de erro
  */
@@ -1167,6 +1136,14 @@ int cmd_leave()
     return 0;
 }
 
+/**
+ * @brief Versão de cmd_leave sem atualização da interface de utilizador.
+ * 
+ * Permite cancelar o registo e sair da rede sem atualizar a interface de utilizador.
+ * Utilizado quando o programa está a terminar e não é necessária a atualização da UI.
+ *
+ * @return 0 em caso de sucesso, -1 em caso de erro
+ */
 int cmd_leave_no_UI()
 {
     if (!node.in_network)
@@ -1268,8 +1245,12 @@ int cmd_leave_no_UI()
     printf("Left network %03d\n", node.network_id);
     return 0;
 }
+
 /**
- * Sair da aplicação.
+ * @brief Sair da aplicação.
+ *
+ * Limpa recursos e termina o programa. Se o nó estiver numa rede,
+ * sai primeiro da rede.
  *
  * @return 0 em caso de sucesso (nunca retorna na realidade, pois termina o programa)
  */
@@ -1287,3 +1268,4 @@ int cmd_exit()
 
     return 0; /* Nunca alcançado */
 }
+

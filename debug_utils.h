@@ -1,8 +1,17 @@
-/*
- * Implementação de Rede de Dados Identificados por Nome (NDN)
- * Redes de Computadores e Internet - 2024/2025
+/**
+ * @file debug_utils.h
+ * @brief Utilitários para depuração e logging
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
+ *
+ * Este ficheiro contém declarações de funções e tipos para facilitar
+ * a depuração e o registo de informações durante a execução do programa.
  * 
- * debug_utils.h - Utilitários para depuração
+ * Inclui:
+ * - Níveis de registo configuráveis
+ * - Funções para mostrar informações sobre o estado do nó
+ * - Utilitários para validar estruturas de dados
+ * - Funções para conversão de estados em strings
  */
 
 #ifndef DEBUG_UTILS_H
@@ -11,7 +20,7 @@
 #include "ndn.h"
 
 /**
- * Níveis de registo para depuração
+ * @brief Níveis de registo para depuração
  */
 typedef enum {
     LOG_ERROR = 0,   /* Erros críticos */
@@ -22,17 +31,22 @@ typedef enum {
 } LogLevel;
 
 /**
- * Nível de registo atual - pode ser alterado em tempo de execução
+ * @brief Nível de registo atual - pode ser alterado em tempo de execução
  */
 extern LogLevel current_log_level;
 
 /**
- * Imprime informação sobre a tabela de interesses - útil para depuração.
+ * @brief Imprime informação sobre a tabela de interesses.
+ * 
+ * Mostra um resumo da tabela de interesses para depuração.
  */
 void debug_interest_table(void);
 
 /**
- * Regista uma mensagem se o nível de registo atual for >= ao nível especificado.
+ * @brief Regista uma mensagem com nível de importância.
+ * 
+ * Gera um registo com timestamp e prefixo de nível apenas se
+ * o nível de registo atual for >= ao nível especificado.
  * 
  * @param level Nível de registo da mensagem
  * @param format Formato da mensagem (estilo printf)
@@ -41,29 +55,39 @@ void debug_interest_table(void);
 void log_message(LogLevel level, const char *format, ...);
 
 /**
- * Imprime informação detalhada sobre a tabela de interesses - útil para depuração.
+ * @brief Imprime informação detalhada sobre a tabela de interesses.
+ * 
+ * Apresenta todas as entradas da tabela de interesses com os seus estados.
  */
 void dump_interest_table();
 
 /**
- * Imprime informação detalhada sobre os vizinhos - útil para depuração.
+ * @brief Imprime informação detalhada sobre os vizinhos.
+ * 
+ * Apresenta os vizinhos externos e internos com os seus endereços e interfaces.
  */
 void dump_neighbors();
 
 /**
- * Imprime informação detalhada sobre os objetos e cache - útil para depuração.
+ * @brief Imprime informação detalhada sobre os objetos e cache.
+ * 
+ * Lista todos os objetos locais e em cache do nó.
  */
 void dump_objects();
 
 /**
- * Ativa ou desativa o modo de depuração.
+ * @brief Ativa ou desativa o modo de depuração.
+ * 
+ * Altera o nível de registo para LOG_DEBUG ou LOG_INFO.
  * 
  * @param enable 1 para ativar, 0 para desativar
  */
 void set_debug_mode(int enable);
 
 /**
- * Obtém a representação em string de um valor de estado.
+ * @brief Obtém a representação em string de um valor de estado.
+ * 
+ * Converte um valor da enumeração interface_state numa string.
  * 
  * @param state Estado a converter para string
  * @return String representativa do estado
@@ -71,7 +95,9 @@ void set_debug_mode(int enable);
 const char* state_to_string(enum interface_state state);
 
 /**
- * Imprime informação sobre mudanças de estado para uma interface de interesse.
+ * @brief Imprime informação sobre mudanças de estado para uma interface de interesse.
+ * 
+ * Mostra as transições de estado de uma interface na tabela de interesses.
  * 
  * @param name Nome do objeto associado ao interesse
  * @param interface_id ID da interface
@@ -81,7 +107,9 @@ const char* state_to_string(enum interface_state state);
 void print_interest_state(char *name, int interface_id, enum interface_state old_state, enum interface_state new_state);
 
 /**
- * Valida a integridade da tabela de interesses.
+ * @brief Valida a integridade da tabela de interesses.
+ * 
+ * Verifica se todos os campos das entradas da tabela de interesses são válidos.
  * 
  * @return 1 se válida, 0 se foram encontrados problemas
  */

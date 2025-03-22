@@ -1,8 +1,17 @@
-/*
- * Implementação de Rede de Dados Identificados por Nome (NDN)
- * Redes de Computadores e Internet - 2024/2025
+/**
+ * @file debug_utils.c
+ * @brief Implementação de utilitários de depuração
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
+ *
+ * Este ficheiro contém a implementação de funções de utilidade para depuração
+ * e logging durante a execução do programa.
  * 
- * debug_utils.c - Implementação de utilitários de depuração
+ * Inclui:
+ * - Funções para mostrar informações detalhadas sobre estado do nó
+ * - Funções para registar mensagens com níveis de importância
+ * - Utilitários para validação de estruturas de dados
+ * - Conversores entre estados e suas representações em string
  */
 
 #include "debug_utils.h"
@@ -15,7 +24,9 @@ LogLevel current_log_level = LOG_INFO;
 int debug_mode = 0;
 
 /**
- * Regista uma mensagem se o nível de registo atual for >= ao nível especificado.
+ * @brief Regista uma mensagem se o nível de registo atual for >= ao nível especificado.
+ * 
+ * Gera um registo formatado com data/hora e prefixo indicando o nível de importância.
  * 
  * @param level Nível de registo da mensagem
  * @param format Formato da mensagem (estilo printf)
@@ -54,7 +65,9 @@ void log_message(LogLevel level, const char *format, ...) {
 }
 
 /**
- * Imprime informação detalhada sobre a tabela de interesses - útil para depuração.
+ * @brief Imprime informação detalhada sobre a tabela de interesses.
+ * 
+ * Lista todas as entradas da tabela, seus estados por interface e idades.
  */
 void dump_interest_table() {
     log_message(LOG_DEBUG, "Interest table dump:");
@@ -83,7 +96,9 @@ void dump_interest_table() {
 }
 
 /**
- * Imprime informação detalhada sobre os vizinhos - útil para depuração.
+ * @brief Imprime informação detalhada sobre os vizinhos.
+ * 
+ * Lista os vizinhos externos, o nó de salvaguarda e os vizinhos internos.
  */
 void dump_neighbors() {
     log_message(LOG_DEBUG, "Neighbors dump:");
@@ -123,7 +138,9 @@ void dump_neighbors() {
 }
 
 /**
- * Imprime informação detalhada sobre os objetos e cache - útil para depuração.
+ * @brief Imprime informação detalhada sobre os objetos e cache.
+ * 
+ * Lista todos os objetos locais e em cache do nó.
  */
 void dump_objects() {
     log_message(LOG_DEBUG, "Objects dump:");
@@ -158,7 +175,9 @@ void dump_objects() {
 }
 
 /**
- * Ativa ou desativa o modo de depuração.
+ * @brief Ativa ou desativa o modo de depuração.
+ * 
+ * Altera o nível de registo para controlar a quantidade de informação mostrada.
  * 
  * @param enable 1 para ativar, 0 para desativar
  */
@@ -175,7 +194,9 @@ void set_debug_mode(int enable) {
 }
 
 /**
- * Obtém a representação em string de um valor de estado.
+ * @brief Obtém a representação em string de um valor de estado.
+ * 
+ * Converte um valor da enumeração interface_state numa string.
  * 
  * @param state Estado a converter para string
  * @return String representativa do estado
@@ -190,7 +211,9 @@ const char* state_to_string(enum interface_state state) {
 }
 
 /**
- * Valida a integridade da tabela de interesses.
+ * @brief Valida a integridade da tabela de interesses.
+ * 
+ * Verifica se todos os campos das entradas da tabela de interesses são válidos.
  * 
  * @return 1 se válida, 0 se foram encontrados problemas
  */
@@ -242,7 +265,9 @@ int validate_interest_table() {
 }
 
 /**
- * Imprime informação sobre mudanças de estado para uma interface de interesse.
+ * @brief Imprime informação sobre mudanças de estado para uma interface de interesse.
+ * 
+ * Mostra as transições de estado de uma interface na tabela de interesses.
  * 
  * @param name Nome do objeto associado ao interesse
  * @param interface_id ID da interface
@@ -272,7 +297,9 @@ void print_interest_state(char *name, int interface_id, enum interface_state old
 }
 
 /**
- * Imprime informação sobre a tabela de interesses - útil para depuração.
+ * @brief Imprime informação sobre a tabela de interesses.
+ * 
+ * Mostra um resumo da tabela de interesses para depuração.
  */
 void debug_interest_table(void) {
     printf("==== INTEREST TABLE DUMP ====\n");

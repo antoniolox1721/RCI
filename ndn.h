@@ -1,3 +1,20 @@
+/**
+ * @file ndn.h
+ * @brief Definições e estruturas para implementação de Rede de Dados Identificados por Nome (NDN)
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
+ *
+ * Este ficheiro contém as definições principais, estruturas de dados e declarações de funções 
+ * para a implementação de uma Rede de Dados Identificados por Nome (NDN).
+ *
+ * Uma rede NDN é um sistema distribuído onde:
+ * - Os objetos são identificados por nomes únicos globalmente
+ * - A topologia da rede é mantida como uma árvore
+ * - Os nós armazenam e reencaminham objetos com base no nome
+ * - As mensagens viajam na direção oposta às mensagens de interesse
+ * - Os objetos são armazenados em cache ao longo do caminho de resposta
+ */
+
 #ifndef NDN_H
 #define NDN_H
 
@@ -13,7 +30,9 @@
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
-#include <fcntl.h>  /* Adicionado para suporte a sockets não bloqueantes */
+#include <fcntl.h>  /* Para suporte a sockets não bloqueantes */
+
+/* Cores para saída formatada no terminal */
 #define COLOR_RESET   "\x1B[0m"
 #define COLOR_RED     "\x1B[31m"
 #define COLOR_GREEN   "\x1B[32m"
@@ -25,7 +44,7 @@
 #define COLOR_BOLD    "\x1B[1m"
 
 /**
- * Definição de constantes globais
+ * @brief Definição de constantes globais para a rede NDN
  */
 #define MAX_INTERFACE 10       /* Número máximo de interfaces que um nó pode ter */
 #define MAX_OBJECT_NAME 100    /* Comprimento máximo de nomes de objetos */
@@ -37,7 +56,8 @@
 #define INTEREST_TIMEOUT 10    /* Tempo limite para mensagens de interesse (em segundos) */
 
 /**
- * Enumeração de estados possíveis para cada interface na tabela de interesses.
+ * @brief Enumeração de estados possíveis para cada interface na tabela de interesses.
+ * 
  * Cada interface em relação a um pedido pode estar num dos seguintes estados:
  */
 enum interface_state {
@@ -47,7 +67,8 @@ enum interface_state {
 };
 
 /**
- * Estrutura que representa um objeto na rede NDN.
+ * @brief Estrutura que representa um objeto na rede NDN.
+ * 
  * Cada objeto tem um nome único e está ligado numa lista ligada.
  */
 typedef struct object {
@@ -56,7 +77,8 @@ typedef struct object {
 } Object;
 
 /**
- * Estrutura que representa uma entrada na tabela de interesses.
+ * @brief Estrutura que representa uma entrada na tabela de interesses.
+ * 
  * Cada entrada contém informação sobre um interesse em curso para um objeto.
  */
 typedef struct interest_entry {
@@ -69,7 +91,8 @@ typedef struct interest_entry {
 
 
 /**
- * Estrutura que representa um vizinho na rede NDN.
+ * @brief Estrutura que representa um vizinho na rede NDN.
+ * 
  * Cada vizinho está ligado através de uma sessão TCP.
  */
 typedef struct neighbor {
@@ -81,7 +104,8 @@ typedef struct neighbor {
 } Neighbor;
 
 /**
- * Estrutura principal que representa o estado do nó.
+ * @brief Estrutura principal que representa o estado do nó.
+ * 
  * Contém toda a informação necessária para o funcionamento do nó na rede NDN.
  */
 typedef struct node {
@@ -112,11 +136,11 @@ typedef struct node {
 extern Node node;
 
 /**
- * Funções de inicialização e limpeza
+ * @brief Funções de inicialização e limpeza
  */
 
 /**
- * Inicializa o nó com as configurações especificadas.
+ * @brief Inicializa o nó com as configurações especificadas.
  * 
  * @param cache_size Tamanho máximo da cache
  * @param ip Endereço IP do nó
@@ -127,52 +151,47 @@ extern Node node;
 void initialize_node(int cache_size, char *ip, char *port, char *reg_ip, int reg_udp);
 
 /**
- * Limpa todos os recursos alocados e termina o programa.
+ * @brief Limpa todos os recursos alocados e termina o programa.
  */
 void cleanup_and_exit();
 
 /**
- * Manipulador para o sinal SIGINT (Ctrl+C).
+ * @brief Manipulador para o sinal SIGINT (Ctrl+C).
  * 
  * @param sig Número do sinal recebido
  */
 void handle_sigint(int sig);
 
 /**
- * Manipuladores de eventos
+ * @brief Manipuladores de eventos
  */
 
 /**
- * Trata a entrada do utilizador através da linha de comandos.
+ * @brief Trata a entrada do utilizador através da linha de comandos.
  */
 void handle_user_input();
 
 /**
- * Trata eventos de rede (novas ligações, dados recebidos, etc.).
+ * @brief Trata eventos de rede (novas ligações, dados recebidos, etc.).
  */
 void handle_network_events();
 
 /**
- * Processa respostas recebidas do servidor de registo.
+ * @brief Processa respostas recebidas do servidor de registo.
  */
 void handle_registration_response();
 
 /**
- * Verifica e processa interesses que excederam o tempo limite.
+ * @brief Verifica e processa interesses que excederam o tempo limite.
  */
 void check_interest_timeouts();
 
 /**
- * Verifica a validade do nó de salvaguarda.
- */
-void check_safety_node_validity();
-
-/**
- * Processamento de comandos
+ * @brief Processamento de comandos
  */
 
 /**
- * Processa um comando introduzido pelo utilizador.
+ * @brief Processa um comando introduzido pelo utilizador.
  * 
  * @param cmd String contendo o comando a processar
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -180,7 +199,7 @@ void check_safety_node_validity();
 int process_command(char *cmd);
 
 /**
- * Mostra informações de ajuda sobre os comandos disponíveis.
+ * @brief Mostra informações de ajuda sobre os comandos disponíveis.
  */
 void print_help();
 

@@ -1,21 +1,46 @@
-/*
- * Implementação de Rede de Dados Identificados por Nome (NDN)
- * Redes de Computadores e Internet - 2024/2025
- * 
- * network.h - Funções para protocolos de rede
+/**
+ * @file network.h
+ * @brief Funções para protocolos de rede numa implementação NDN
+ * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
+ * @date Março de 2025
+ *
+ * Este ficheiro contém as declarações de funções para implementar os protocolos
+ * de comunicação necessários para a rede NDN:
+ *
+ * 1. Protocolo de Registo (UDP):
+ *    - Comunica com o servidor de registo para registar/cancelar registo de nós
+ *    - Obtém listas de nós existentes numa rede
+ *
+ * 2. Protocolo de Topologia (TCP):
+ *    - Trata mensagens ENTRY e SAFE para manter a topologia em árvore
+ *    - Gere a recuperação de falhas de nós
+ *
+ * 3. Protocolo NDN (TCP):
+ *    - Trata mensagens INTEREST, OBJECT e NOOBJECT
+ *    - Gere a tabela de interesses e encaminha mensagens
  */
 
 #ifndef NETWORK_H
 #define NETWORK_H
 
 #include "ndn.h"
-void display_interest_table_update(const char* action, const char* name);
-/**
- * Protocolo de registo
- */
 
 /**
- * Atualiza as informações de um vizinho com o porto de escuta correto.
+ * @brief Exibe atualizações da tabela de interesses de forma formatada.
+ * 
+ * Função de utilidade para mostrar atualizações na tabela de interesses
+ * durante as operações de protocolo NDN.
+ * 
+ * @param action Descrição da ação realizada
+ * @param name Nome do objeto relacionado à ação
+ */
+void display_interest_table_update(const char* action, const char* name);
+
+/**
+ * @brief Atualiza as informações de um vizinho com o porto de escuta correto.
+ * 
+ * Quando recebemos uma mensagem ENTRY, atualizamos o porto do vizinho para
+ * o porto de escuta real, não o porto efémero da ligação.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do vizinho
@@ -25,7 +50,10 @@ void display_interest_table_update(const char* action, const char* name);
 int update_neighbor_info(int fd, char *ip, char *port);
 
 /**
- * Remove um vizinho da lista de vizinhos.
+ * @brief Remove um vizinho da lista de vizinhos.
+ * 
+ * Remove um vizinho tanto da lista de vizinhos geral como, se aplicável,
+ * da lista de vizinhos internos.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @return 0 em caso de sucesso, -1 se o vizinho não for encontrado
@@ -33,7 +61,10 @@ int update_neighbor_info(int fd, char *ip, char *port);
 int remove_neighbor(int fd);
 
 /**
- * Trata a desconexão de um vizinho externo.
+ * @brief Trata a desconexão de um vizinho externo.
+ * 
+ * Implementa o procedimento de recuperação quando um vizinho externo
+ * se desconecta da rede.
  * 
  * @param removed_ip Endereço IP do vizinho removido
  * @param removed_port Porto TCP do vizinho removido
@@ -42,7 +73,10 @@ int remove_neighbor(int fd);
 int handle_external_neighbor_disconnect(char *removed_ip, char *removed_port);
 
 /**
- * Envia uma mensagem de registo ao servidor de registo.
+ * @brief Envia uma mensagem de registo ao servidor de registo.
+ * 
+ * Envia uma mensagem REG ao servidor de registo para registar
+ * o nó numa rede específica.
  * 
  * @param net ID da rede (três dígitos)
  * @param ip Endereço IP do nó
@@ -52,7 +86,10 @@ int handle_external_neighbor_disconnect(char *removed_ip, char *removed_port);
 int send_reg_message(char *net, char *ip, char *port);
 
 /**
- * Envia uma mensagem de remoção de registo ao servidor de registo.
+ * @brief Envia uma mensagem de remoção de registo ao servidor de registo.
+ * 
+ * Envia uma mensagem UNREG ao servidor de registo para remover
+ * o registo do nó de uma rede.
  * 
  * @param net ID da rede (três dígitos)
  * @param ip Endereço IP do nó
@@ -62,7 +99,10 @@ int send_reg_message(char *net, char *ip, char *port);
 int send_unreg_message(char *net, char *ip, char *port);
 
 /**
- * Envia um pedido de lista de nós ao servidor de registo.
+ * @brief Envia um pedido de lista de nós ao servidor de registo.
+ * 
+ * Envia uma mensagem NODES ao servidor de registo para obter
+ * a lista de nós numa rede específica.
  * 
  * @param net ID da rede (três dígitos)
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -70,7 +110,10 @@ int send_unreg_message(char *net, char *ip, char *port);
 int send_nodes_request(char *net);
 
 /**
- * Processa a resposta NODESLIST do servidor de registo.
+ * @brief Processa a resposta NODESLIST do servidor de registo.
+ * 
+ * Analisa a resposta NODESLIST do servidor de registo, escolhe
+ * um nó aleatoriamente e tenta conectar-se a ele.
  * 
  * @param buffer Buffer contendo a resposta NODESLIST
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -78,11 +121,10 @@ int send_nodes_request(char *net);
 int process_nodeslist_response(char *buffer);
 
 /**
- * Protocolo de topologia
- */
-
-/**
- * Envia uma mensagem ENTRY para um nó.
+ * @brief Envia uma mensagem ENTRY para um nó.
+ * 
+ * Envia uma mensagem ENTRY com o endereço IP e porto TCP
+ * do nó emissor.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó emissor
@@ -92,7 +134,10 @@ int process_nodeslist_response(char *buffer);
 int send_entry_message(int fd, char *ip, char *port);
 
 /**
- * Envia uma mensagem SAFE para um nó.
+ * @brief Envia uma mensagem SAFE para um nó.
+ * 
+ * Envia uma mensagem SAFE com o endereço IP e porto TCP
+ * do nó de salvaguarda.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó de salvaguarda
@@ -102,7 +147,10 @@ int send_entry_message(int fd, char *ip, char *port);
 int send_safe_message(int fd, char *ip, char *port);
 
 /**
- * Processa uma mensagem ENTRY recebida.
+ * @brief Processa uma mensagem ENTRY recebida.
+ * 
+ * Implementa o procedimento para tratar uma mensagem ENTRY
+ * recebida de um nó.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó emissor
@@ -112,7 +160,10 @@ int send_safe_message(int fd, char *ip, char *port);
 int handle_entry_message(int fd, char *ip, char *port);
 
 /**
- * Processa uma mensagem SAFE recebida.
+ * @brief Processa uma mensagem SAFE recebida.
+ * 
+ * Implementa o procedimento para tratar uma mensagem SAFE
+ * recebida de um nó.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param ip Endereço IP do nó de salvaguarda
@@ -122,11 +173,9 @@ int handle_entry_message(int fd, char *ip, char *port);
 int handle_safe_message(int fd, char *ip, char *port);
 
 /**
- * Protocolo NDN
- */
-
-/**
- * Envia uma mensagem de interesse para um objeto.
+ * @brief Envia uma mensagem de interesse para um objeto.
+ * 
+ * Envia uma mensagem INTEREST para solicitar um objeto pelo nome.
  * 
  * @param name Nome do objeto pretendido
  * @return 0 em caso de sucesso, -1 em caso de erro
@@ -134,7 +183,9 @@ int handle_safe_message(int fd, char *ip, char *port);
 int send_interest_message(char *name);
 
 /**
- * Envia uma mensagem de objeto como resposta a um interesse.
+ * @brief Envia uma mensagem de objeto como resposta a um interesse.
+ * 
+ * Envia uma mensagem OBJECT contendo o nome do objeto encontrado.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto
@@ -143,7 +194,10 @@ int send_interest_message(char *name);
 int send_object_message(int fd, char *name);
 
 /**
- * Envia uma mensagem NOOBJECT quando um objeto não é encontrado.
+ * @brief Envia uma mensagem NOOBJECT quando um objeto não é encontrado.
+ * 
+ * Envia uma mensagem NOOBJECT indicando que o objeto solicitado
+ * não foi encontrado.
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto não encontrado
@@ -152,7 +206,12 @@ int send_object_message(int fd, char *name);
 int send_noobject_message(int fd, char *name);
 
 /**
- * Processa uma mensagem de interesse recebida.
+ * @brief Processa uma mensagem de interesse recebida.
+ * 
+ * Implementa o procedimento para tratar uma mensagem INTEREST recebida:
+ * - Verifica se o objeto existe localmente
+ * - Atualiza a tabela de interesses
+ * - Encaminha o interesse se necessário
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto pretendido
@@ -161,7 +220,12 @@ int send_noobject_message(int fd, char *name);
 int handle_interest_message(int fd, char *name);
 
 /**
- * Processa uma mensagem de objeto recebida.
+ * @brief Processa uma mensagem de objeto recebida.
+ * 
+ * Implementa o procedimento para tratar uma mensagem OBJECT recebida:
+ * - Adiciona o objeto à cache
+ * - Encaminha o objeto para interfaces em estado RESPONSE
+ * - Remove a entrada de interesse correspondente
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto recebido
@@ -170,7 +234,12 @@ int handle_interest_message(int fd, char *name);
 int handle_object_message(int fd, char *name);
 
 /**
- * Processa uma mensagem NOOBJECT recebida.
+ * @brief Processa uma mensagem NOOBJECT recebida.
+ * 
+ * Implementa o procedimento para tratar uma mensagem NOOBJECT recebida:
+ * - Marca a interface como CLOSED
+ * - Verifica se ainda há interfaces em estado WAITING
+ * - Encaminha NOOBJECT para interfaces em estado RESPONSE se necessário
  * 
  * @param fd Descritor de ficheiro da ligação
  * @param name Nome do objeto não encontrado
@@ -179,44 +248,45 @@ int handle_object_message(int fd, char *name);
 int handle_noobject_message(int fd, char *name);
 
 /**
- * Gestão de timeouts de interesses
- */
-
-/**
- * Verifica e processa interesses que excederam o tempo limite.
+ * @brief Verifica e processa interesses que excederam o tempo limite.
+ * 
+ * Verifica se há interesses com tempo limite excedido e envia
+ * mensagens NOOBJECT para interfaces em estado RESPONSE.
  */
 void check_interest_timeouts();
 
 /**
- * Gestão de respostas do servidor de registo
- */
-
-/**
- * Processa respostas recebidas do servidor de registo.
+ * @brief Processa respostas recebidas do servidor de registo.
+ * 
+ * Trata as respostas recebidas do servidor de registo:
+ * - NODESLIST: Lista de nós numa rede
+ * - OKREG: Confirmação de registo
+ * - OKUNREG: Confirmação de cancelamento de registo
  */
 void handle_registration_response();
 
 /**
- * Gestão de eventos de rede
- */
-
-/**
- * Processa eventos de rede (novas ligações, dados recebidos, etc.).
+ * @brief Processa eventos de rede (novas ligações, dados recebidos, etc.).
+ * 
+ * Trata os eventos de rede detetados pelo select():
+ * - Aceita novas ligações
+ * - Processa dados recebidos de ligações existentes
+ * - Trata desconexões
  */
 void handle_network_events();
 
 /**
- * Atualiza e propaga informações do nó de salvaguarda para todos os vizinhos internos.
- * Deve ser chamada sempre que a topologia muda de forma a afetar os nós de salvaguarda.
+ * @brief Atualiza e propaga informações do nó de salvaguarda para todos os vizinhos internos.
+ * 
+ * Envia mensagens SAFE para todos os vizinhos internos com a informação
+ * do nó de salvaguarda atualizada.
  */
 void update_and_propagate_safety_node();
 
 /**
- * Utilidades de rede
- */
-
-/**
- * Estabelece uma ligação TCP com um nó.
+ * @brief Estabelece uma ligação TCP com um nó.
+ * 
+ * Cria um socket TCP, configura timeout e estabelece ligação com o nó destino.
  * 
  * @param ip Endereço IP do nó destino
  * @param port Porto TCP do nó destino
@@ -225,7 +295,10 @@ void update_and_propagate_safety_node();
 int connect_to_node(char *ip, char *port);
 
 /**
- * Adiciona um vizinho à lista de vizinhos.
+ * @brief Adiciona um vizinho à lista de vizinhos.
+ * 
+ * Adiciona um novo vizinho à lista de vizinhos e, se for um vizinho interno,
+ * também à lista de vizinhos internos.
  * 
  * @param ip Endereço IP do vizinho
  * @param port Porto TCP do vizinho
@@ -236,14 +309,19 @@ int connect_to_node(char *ip, char *port);
 int add_neighbor(char *ip, char *port, int fd, int is_external);
 
 /**
- * Reinicia o interesse para um objeto, removendo a sua entrada.
+ * @brief Reinicia o interesse para um objeto, removendo a sua entrada.
+ * 
+ * Remove uma entrada da tabela de interesses, marcando-a primeiro
+ * como a ser removida para evitar problemas de concorrência.
  * 
  * @param name Nome do objeto associado ao interesse a reiniciar
  */
 void reset_interest_for_object(char *name);
 
 /**
- * Inicializa uma entrada de interesse.
+ * @brief Inicializa uma entrada de interesse.
+ *
+ * Configura os valores iniciais de uma nova entrada de interesse.
  *
  * @param entry Apontador para a entrada de interesse a inicializar
  * @param name Nome do objeto associado à entrada
