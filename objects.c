@@ -470,9 +470,15 @@ int is_valid_name(char *name) {
         return 0;
     }
     
-    /* Verifica se todos os caracteres são alfanuméricos */
+    /* Check if all characters are valid (alphanum, hyphen, underscore) */
     for (int i = 0; name[i]; i++) {
-        if (!isalnum(name[i])) {
+        /* Reject spaces between words */
+        if (isspace(name[i])) {
+            return 0;
+        }
+        
+        /* Accept alphanumeric, hyphen, and underscore */
+        if (!isalnum(name[i]) && name[i] != '-' && name[i] != '_') {
             return 0;
         }
     }

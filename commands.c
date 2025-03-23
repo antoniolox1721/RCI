@@ -12,7 +12,7 @@
  * - Gestão de objetos: create, delete, retrieve
  * - Visualização de informações: show_topology, show_names, show_interest_table
  *
- * PARTE 1: Inclui as funções process_command, print_help, cmd_join e cmd_direct_join
+ * 
  */
 
 #include "commands.h"
