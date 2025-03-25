@@ -296,12 +296,32 @@ void handle_network_events()
             }
             else
             {
-                /* Processa a mensagem recebida */
-                buffer[bytes_received] = '\0';
-                printf("Received %d bytes from %s:%s: %s\n", bytes_received, curr->ip, curr->port, buffer);
+                /* Append new data to existing buffer */
+                if (curr->buffer_len + bytes_received < MAX_BUFFER) {
+                    memcpy(curr->buffer + curr->buffer_len, buffer, bytes_received);
+                    curr->buffer_len += bytes_received;
+                    curr->buffer[curr->buffer_len] = '\0';
+                } else {
+                    /* Buffer overflow scenario - discard oldest data */
+                    printf("Warning: Buffer overflow, discarding oldest data\n");
+                    int space_needed = (curr->buffer_len + bytes_received) - (MAX_BUFFER - 1);
+                    if (space_needed > 0 && space_needed < curr->buffer_len) {
+                        memmove(curr->buffer, curr->buffer + space_needed, curr->buffer_len - space_needed);
+                        curr->buffer_len -= space_needed;
+                        memcpy(curr->buffer + curr->buffer_len, buffer, bytes_received);
+                        curr->buffer_len += bytes_received;
+                    } else {
+                        /* If can't make enough space, just use new data */
+                        memcpy(curr->buffer, buffer, bytes_received);
+                        curr->buffer_len = bytes_received;
+                    }
+                    curr->buffer[curr->buffer_len] = '\0';
+                }
+                
+                printf("Received %d bytes from %s:%s, buffer now: %s\n", bytes_received, curr->ip, curr->port, curr->buffer);
 
                 /* Process each complete message in the buffer */
-                char *message_start = buffer;
+                char *message_start = curr->buffer;
                 char *message_end;
                 
                 while ((message_end = strchr(message_start, '\n')) != NULL) {
@@ -469,10 +489,17 @@ void handle_network_events()
                     message_start = message_end + 1;
                 }
                 
-                /* Process any remaining message fragment (without newline) */
-                if (*message_start != '\0') {
-                    printf("Warning: Received incomplete message without newline: %s\n", message_start);
-                    /* We could process it, but protocol messages should end with \n */
+                /* Save any remaining partial message for next time */
+                if (message_start < curr->buffer + curr->buffer_len) {
+                    int remaining_len = curr->buffer_len - (message_start - curr->buffer);
+                    memmove(curr->buffer, message_start, remaining_len);
+                    curr->buffer_len = remaining_len;
+                    curr->buffer[curr->buffer_len] = '\0';
+                    printf("Saved partial message for next read: %s\n", curr->buffer);
+                } else {
+                    /* No remaining partial message */
+                    curr->buffer_len = 0;
+                    curr->buffer[0] = '\0';
                 }
             }
         }
@@ -1543,6 +1570,7 @@ int add_neighbor(char *ip, char *port, int fd, int is_external)
     strcpy(new_neighbor->ip, ip);
     strcpy(new_neighbor->port, port);
     new_neighbor->fd = fd;
+    new_neighbor->buffer_len = 0; /* Initialize the buffer length */
 
     /* Encontra o próximo ID de interface disponível */
     int interface_id = 1;

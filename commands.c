@@ -660,17 +660,6 @@ int cmd_show_topology()
     return 0;
 }
 
-/**
- * @file commands.c
- * @brief Implementação das funções de comandos do utilizador (continuação)
- * @author Bárbara Gonçalves Modesto e António Pedro Lima Loureiro Alves
- * @date Março de 2025
- *
- * Este ficheiro contém a implementação das funções para processar comandos
- * introduzidos pelo utilizador na interface da aplicação NDN.
- *
- * PARTE 3: Inclui as funções cmd_show_names, cmd_show_interest_table, cmd_leave, cmd_leave_no_UI e cmd_exit
- */
 
 /**
  * @brief Mostrar nomes de objetos armazenados.

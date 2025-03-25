@@ -101,6 +101,8 @@ typedef struct neighbor {
     int fd;                    /* Descritor de ficheiro para a ligação */
     int interface_id;          /* ID da interface */
     struct neighbor *next;     /* Apontador para o próximo vizinho na lista */
+    char buffer[MAX_BUFFER];   /* Buffer for partial messages */
+    int buffer_len;            /* Current length of data in buffer */
 } Neighbor;
 
 /**
